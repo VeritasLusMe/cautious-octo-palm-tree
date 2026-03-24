@@ -665,6 +665,57 @@ main {
 @keyframes slideIn { from { opacity:0; transform: scale(0.96); } to { opacity:1; transform: scale(1); } }
 .animate-in { animation: slideIn 0.2s ease; }
 
+/* ── SPOTIFY OPEN BUTTON (shows on mobile only) ── */
+.cmp-open-btn, .f5-open-btn {
+  display: none;   /* shown via mobile media query */
+  position: absolute;
+  top: 10px; right: 10px;
+  z-index: 10;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+  color: #1ed760;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+.cmp-open-btn:active, .f5-open-btn:active { transform: scale(0.88); }
+
+/* ── SPOTIFY LOGIN HINT (sort page top banner) ── */
+#spotifyHint {
+  display: none;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.78rem;
+  color: var(--text2);
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  #spotifyHint { display: flex; }
+}
+.spotify-hint-text { flex: 1; line-height: 1.5; }
+.spotify-login-btn {
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid #1ed760;
+  background: transparent;
+  color: #1ed760;
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* Divider */
 .divider { height: 1px; background: var(--border); margin: 24px 0; }
 
@@ -765,6 +816,149 @@ body {
 
   /* Rank items: hide comps count on narrow screens */
   .rank-comps { display: none; }
+
+  /* ── MOBILE SORT: single-screen layout ── */
+  #phase-sort {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 56px - 56px - env(safe-area-inset-bottom));
+    overflow: hidden;
+    padding: 0;          /* main의 패딩 무시 */
+  }
+  /* main padding은 다른 phase에서만 적용 */
+  #phase-sort .sort-header  { padding: 12px 16px 0; margin-bottom: 8px; flex-shrink: 0; }
+  #phase-sort .rsi-bar-wrap { margin: 0 16px 8px; padding: 8px 12px; flex-shrink: 0; }
+  #phase-sort #binaryMode,
+  #phase-sort #fiveStepMode { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #phase-sort #binaryMode[style*="none"],
+  #phase-sort #fiveStepMode[style*="none"] { display: none !important; }
+
+  /* Binary grid fills remaining space */
+  #phase-sort .binary-grid  { flex: 1; min-height: 0; gap: 8px; margin: 0 16px; }
+  #phase-sort .binary-hint  { flex-shrink: 0; padding: 6px 0 0; margin: 0 16px; }
+
+  /* ── Compare cards: album-cover overlay style on mobile ── */
+  .cmp-card {
+    display: block;          /* override flex */
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+    cursor: pointer;
+  }
+  /* Image fills the entire card */
+  .cmp-img-wrap {
+    position: absolute;
+    inset: 0;
+    padding-bottom: 0;
+  }
+  .cmp-img-wrap img {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s;
+  }
+  .cmp-card:active .cmp-img-wrap img { transform: scale(1.04); }
+
+  /* Text overlay at bottom */
+  .cmp-body {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 2;
+    padding: 32px 12px 12px;
+    background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 50%, transparent 100%);
+    pointer-events: none;   /* let card click through */
+  }
+  .cmp-name  { font-size: 0.88rem; margin-bottom: 2px; }
+  .cmp-artist{ font-size: 0.73rem; margin-bottom: 6px; }
+  .cmp-elo   { font-size: 0.72rem; }
+
+  /* Spotify open button (top-right corner of each card) */
+  .cmp-open-btn {
+    display: flex !important;
+  }
+
+  /* ── Five-step overlay cards ── */
+  #phase-sort #fiveStepMode {
+    gap: 8px;
+  }
+  .fiveStep-top-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+    margin: 0 16px;
+  }
+  .fiveStep-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 14px;
+  }
+  .fiveStep-card-img {
+    position: absolute;
+    inset: 0;
+    padding-bottom: 0;
+  }
+  .fiveStep-card-img img {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .fiveStep-card-body {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 2;
+    padding: 24px 10px 10px;
+    background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+    pointer-events: none;
+  }
+  .fiveStep-card-name   { font-size: 0.8rem; }
+  .fiveStep-card-artist { font-size: 0.7rem; margin-bottom: 3px; }
+  .fiveStep-card-elo    { font-size: 0.7rem; }
+
+  /* Open-in-Spotify button on five-step cards */
+  .f5-open-btn { display: flex !important; }
+
+  /* Five-step buttons: horizontal scrollable row */
+  .five-btns-row {
+    display: flex;
+    gap: 6px;
+    padding: 8px 16px;
+    overflow-x: auto;
+    flex-shrink: 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .five-btns-row::-webkit-scrollbar { display: none; }
+  .five-btn {
+    width: auto;
+    min-width: 100px;
+    flex-shrink: 0;
+    padding: 11px 12px;
+    font-size: 0.8rem;
+  }
+  .five-vs { display: none; }
+
+  /* Hide desktop five-btns column, show row */
+  .five-btns { display: none; }
+  .fiveStep-grid { display: contents; }
+
+  /* Sort footer compact */
+  #phase-sort .sort-footer {
+    flex-shrink: 0;
+    padding: 8px 16px 6px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Sort embeds: hide on mobile (replaced by overlay buttons) */
+  .sort-embeds { display: none !important; }
+
+  /* Sort header: compact on mobile */
+  .sort-title { font-size: 0.9rem; }
+  .sort-meta  { font-size: 0.75rem; gap: 8px; }
+  .rsi-hint   { display: none; }
 }
 
 /* ── INSTALL BANNER ── */
@@ -953,16 +1147,22 @@ body {
     <div>
       <div class="sort-title">비교 정렬</div>
       <div class="sort-meta">
-        <span>⚔️ 비교 횟수: <strong id="compCountDisplay">0</strong>회</span>
-        <span>📊 티어 분류: <strong id="sortTieredDisplay">0</strong>곡</span>
-        <span id="rsiStatus" style="display:none">✅ 수렴 달성</span>
+        <span>⚔️ <strong id="compCountDisplay">0</strong>회</span>
+        <span>📊 <strong id="sortTieredDisplay">0</strong>곡</span>
+        <span id="rsiStatus" style="display:none">✅ 수렴</span>
       </div>
     </div>
     <div id="modeBadge" class="mode-badge mode-binary">이진 선택</div>
   </div>
 
+  <!-- Spotify 로그인 안내 (모바일만 표시) -->
+  <div id="spotifyHint">
+    <div class="spotify-hint-text">🎵 전곡 재생: Safari에서 Spotify 로그인 필요. 또는 <strong>앱에서 열기(↗)</strong> 버튼으로 Spotify 앱에서 바로 재생</div>
+    <button class="spotify-login-btn" onclick="window.open('https://open.spotify.com','_blank')">로그인</button>
+  </div>
+
   <div class="rsi-bar-wrap">
-    <span class="rsi-label">수렴 (RSI)</span>
+    <span class="rsi-label">수렴</span>
     <div class="rsi-track"><div class="rsi-fill" id="rsiFill" style="width:0%;background:var(--danger)"></div></div>
     <span class="rsi-val" id="rsiValDisplay">—</span>
     <span class="rsi-hint">목표: &lt;10점</span>
@@ -971,6 +1171,8 @@ body {
   <!-- Binary Mode -->
   <div id="binaryMode">
     <div class="binary-grid animate-in" id="binaryGrid">
+
+      <!-- Card A -->
       <div class="cmp-card" id="cardA" onclick="choose(1.0)">
         <div class="cmp-img-wrap"><img id="bImgA" src="" alt=""></div>
         <div class="cmp-body">
@@ -981,7 +1183,15 @@ body {
             <span class="cmp-elo-num" id="bEloA"></span>
           </div>
         </div>
+        <!-- Spotify 앱에서 열기 (모바일) -->
+        <button class="cmp-open-btn" onclick="openInSpotify(0,event)" title="Spotify 앱에서 열기">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+            <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+          </svg>
+        </button>
       </div>
+
+      <!-- Card B -->
       <div class="cmp-card" id="cardB" onclick="choose(0.0)">
         <div class="cmp-img-wrap"><img id="bImgB" src="" alt=""></div>
         <div class="cmp-body">
@@ -992,22 +1202,36 @@ body {
             <span class="cmp-elo-num" id="bEloB"></span>
           </div>
         </div>
+        <button class="cmp-open-btn" onclick="openInSpotify(1,event)" title="Spotify 앱에서 열기">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+            <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+          </svg>
+        </button>
       </div>
+
     </div>
-    <div class="binary-hint">클릭하거나 <kbd style="font-family:var(--mono);background:var(--surface3);padding:1px 6px;border-radius:4px;font-size:0.75rem">←</kbd> / <kbd style="font-family:var(--mono);background:var(--surface3);padding:1px 6px;border-radius:4px;font-size:0.75rem">→</kbd> 키로 선택</div>
+    <div class="binary-hint">탭하거나 <kbd style="font-family:var(--mono);background:var(--surface3);padding:1px 6px;border-radius:4px;font-size:0.75rem">←</kbd>/<kbd style="font-family:var(--mono);background:var(--surface3);padding:1px 6px;border-radius:4px;font-size:0.75rem">→</kbd> 로 선택</div>
   </div>
 
   <!-- Five-step Mode -->
   <div id="fiveStepMode" style="display:none">
+
+    <!-- 두 앨범 카드 (desktop: 3-col grid / mobile: 2-col top row) -->
     <div class="fiveStep-grid animate-in">
-      <div class="fiveStep-card">
+
+      <!-- Desktop only: 3-col layout (card | btns | card) -->
+      <div class="fiveStep-card" id="f5CardA">
         <div class="fiveStep-card-img"><img id="f5ImgA" src="" alt=""></div>
         <div class="fiveStep-card-body">
           <div class="fiveStep-card-name" id="f5NameA"></div>
           <div class="fiveStep-card-artist" id="f5ArtistA"></div>
           <div class="fiveStep-card-elo" id="f5EloA"></div>
         </div>
+        <button class="f5-open-btn cmp-open-btn" onclick="openInSpotify(0,event)" title="Spotify 앱에서 열기">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+        </button>
       </div>
+
       <div class="five-btns">
         <div class="five-vs">A &nbsp;&nbsp;VS&nbsp;&nbsp; B</div>
         <button class="five-btn btn-a-strong" onclick="choose(1.0)"><span>A가 훨씬 좋다</span><span class="five-btn-key">1</span></button>
@@ -1016,17 +1240,32 @@ body {
         <button class="five-btn btn-b-mild"   onclick="choose(0.3)"><span>B가 조금 좋다</span><span class="five-btn-key">4</span></button>
         <button class="five-btn btn-b-strong" onclick="choose(0.0)"><span>B가 훨씬 좋다</span><span class="five-btn-key">5</span></button>
       </div>
-      <div class="fiveStep-card">
+
+      <div class="fiveStep-card" id="f5CardB">
         <div class="fiveStep-card-img"><img id="f5ImgB" src="" alt=""></div>
         <div class="fiveStep-card-body">
           <div class="fiveStep-card-name" id="f5NameB"></div>
           <div class="fiveStep-card-artist" id="f5ArtistB"></div>
           <div class="fiveStep-card-elo" id="f5EloB"></div>
         </div>
+        <button class="f5-open-btn cmp-open-btn" onclick="openInSpotify(1,event)" title="Spotify 앱에서 열기">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+        </button>
       </div>
     </div>
+
+    <!-- Mobile five-step: horizontal scrollable button row -->
+    <div class="five-btns-row">
+      <button class="five-btn btn-a-strong" onclick="choose(1.0)">A 훨씬 좋다</button>
+      <button class="five-btn btn-a-mild"   onclick="choose(0.7)">A 조금 좋다</button>
+      <button class="five-btn btn-tie"      onclick="choose(0.5)">비슷하다</button>
+      <button class="five-btn btn-b-mild"   onclick="choose(0.3)">B 조금 좋다</button>
+      <button class="five-btn btn-b-strong" onclick="choose(0.0)">B 훨씬 좋다</button>
+    </div>
+
   </div>
 
+  <!-- Sort embeds (desktop only — hidden on mobile via CSS) -->
   <div class="sort-embeds" id="sortEmbeds">
     <div class="embed-wrap"><iframe id="sortEmbedA" src="" width="100%" height="80" frameborder="0"
       allow="autoplay; clipboard-write; encrypted-media" loading="lazy"></iframe></div>
@@ -1035,9 +1274,9 @@ body {
   </div>
 
   <div class="sort-footer">
-    <button class="btn btn-outline btn-sm" onclick="goPhase('rank')">🏆 현재 랭킹 보기</button>
+    <button class="btn btn-outline btn-sm" onclick="goPhase('rank')">🏆 랭킹 보기</button>
     <div class="btn-row">
-      <button class="btn btn-outline btn-sm" onclick="exportJSON()">💾 JSON 내보내기</button>
+      <button class="btn btn-outline btn-sm" onclick="exportJSON()">💾 저장</button>
       <button class="btn btn-green btn-sm" onclick="goPhase('rank')">완료 →</button>
     </div>
   </div>
@@ -1554,6 +1793,16 @@ function choose(scoreA) {
   compCount++;
   saveState();
   renderSort();
+}
+
+// Spotify 앱 딥링크 열기 (프리미엄 전곡 재생)
+function openInSpotify(idx, e) {
+  e.stopPropagation();  // 카드 선택(choose) 이벤트 차단
+  if (!curPair) return;
+  const track = curPair[idx];
+  const uri = track.uri || `spotify:track:${track.id}`;
+  // iOS: spotify: scheme이 앱 설치시 앱 오픈, 미설치시 웹으로 fallback
+  window.location.href = uri;
 }
 
 // ══════════════════════════════════════════════
