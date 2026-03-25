@@ -2,22 +2,8 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>ELO Sorter</title>
-
-<!-- ── PWA: 기본 ── -->
-<meta name="theme-color" content="#090912">
-<meta name="description" content="음악 ELO 선호도 정렬기">
-
-<!-- ── PWA: iOS Safari ── -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="ELO Sorter">
-<link rel="apple-touch-icon" id="appleIcon">
-
-<!-- ── PWA: Manifest (inline data URI) ── -->
-<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22ELO%20%EC%9D%8C%EC%95%85%20%EC%A0%95%EB%A0%AC%EA%B8%B0%22%2C%22short_name%22%3A%22ELO%20Sorter%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23090912%22%2C%22theme_color%22%3A%22%23090912%22%2C%22orientation%22%3A%22portrait%22%7D">
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELO 음악 정렬기</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
@@ -123,8 +109,27 @@ main {
   margin: 0 auto;
   padding: 32px 24px 80px;
 }
+
+/* 🌟 추가: 비교 정렬 화면을 가득 채우기 위한 특수 클래스 */
+main.sort-fullscreen {
+  max-width: 60%;
+  margin: 0 auto;
+  height: calc(100vh - 56px); /* 헤더를 제외한 전체 화면 높이 */
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto; /* 전체화면 시 이중 스크롤 방지 */
+}
+
 .phase { display: none; }
 .phase.active { display: block; }
+
+/* 🌟 수정: 비교 정렬 페이지만 flex로 세로 영역을 차지하게 설정 */
+#phase-sort.active { 
+  display: flex; 
+  flex-direction: column; 
+  height: 100%; 
+}
 
 /* ── IMPORT PHASE ── */
 .drop-zone {
@@ -222,7 +227,6 @@ main {
   .tier-layout { grid-template-columns: 1fr; }
 }
 
-/* Album cover + overlay mini player */
 .tier-cover-wrap {
   position: relative;
   width: 100%;
@@ -241,7 +245,6 @@ main {
 }
 .tier-cover-wrap:hover .tier-cover-img { transform: scale(1.04); }
 
-/* Spotify API iframe lives here — clipped to 0 height but rendered */
 .spotify-api-mount {
   position: absolute;
   bottom: 0; left: 0; right: 0;
@@ -250,7 +253,6 @@ main {
   z-index: 0;
 }
 
-/* Bottom gradient overlay */
 .tier-cover-overlay {
   position: absolute;
   bottom: 0; left: 0; right: 0;
@@ -290,73 +292,37 @@ main {
   to   { height: 14px; opacity: 1; }
 }
 
-.tier-overlay-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px;
-}
+.tier-overlay-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
 .tier-overlay-text { flex: 1; min-width: 0; }
 .tier-overlay-name {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 1.15rem;
-  line-height: 1.3;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 3px;
-  text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+  font-family: var(--serif); font-style: italic; font-size: 1.15rem; line-height: 1.3;
+  color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 3px; text-shadow: 0 1px 8px rgba(0,0,0,0.8);
 }
 .tier-overlay-artist {
-  font-size: 0.82rem;
-  color: rgba(255,255,255,0.65);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 1px;
+  font-size: 0.82rem; color: rgba(255,255,255,0.65); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px;
 }
 .tier-overlay-album {
-  font-size: 0.73rem;
-  color: rgba(255,255,255,0.35);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 0.73rem; color: rgba(255,255,255,0.35); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
 }
 
 .tier-play-btn {
-  width: 42px; height: 42px;
-  border-radius: 50%;
-  border: none;
-  background: var(--accent);
-  color: #000;
-  cursor: pointer;
+  width: 42px; height: 42px; border-radius: 50%; border: none;
+  background: var(--accent); color: #000; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.18s;
-  box-shadow: 0 4px 18px rgba(0,232,122,0.45);
+  flex-shrink: 0; transition: all 0.18s; box-shadow: 0 4px 18px rgba(0,232,122,0.45);
 }
 .tier-play-btn:hover  { transform: scale(1.12); background: #1ed760; }
 .tier-play-btn:active { transform: scale(0.93); }
 .tier-play-btn svg    { pointer-events: none; }
 
-.tier-right h3 { font-size: 0.9rem; font-weight: 600; color: var(--text2); margin-bottom: 16px; letter-spacing: 0.05em; text-transform: uppercase; }
-
 .tier-btns { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
 .tier-btn {
-  width: 100%;
-  padding: 16px 20px;
-  border-radius: 12px;
-  border: 1.5px solid;
-  background: transparent;
-  cursor: pointer;
-  transition: all 0.15s;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-family: var(--sans);
-  text-align: left;
+  width: 100%; padding: 16px 20px; border-radius: 12px; border: 1.5px solid;
+  background: transparent; cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; gap: 12px; font-family: var(--sans); text-align: left;
 }
 .tier-btn:active { transform: scale(0.98); }
 .tier-btn-1 { border-color: rgba(255,214,10,0.35); color: var(--t1); }
@@ -366,13 +332,9 @@ main {
 .tier-btn-3 { border-color: rgba(124,143,166,0.3); color: var(--t3); }
 .tier-btn-3:hover { background: var(--t3-dim); border-color: var(--t3); }
 .tier-btn-key {
-  width: 28px; height: 28px;
-  border-radius: 6px;
-  background: rgba(255,255,255,0.06);
+  width: 28px; height: 28px; border-radius: 6px; background: rgba(255,255,255,0.06);
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--mono);
-  font-size: 0.8rem;
-  flex-shrink: 0;
+  font-family: var(--mono); font-size: 0.8rem; flex-shrink: 0;
 }
 .tier-btn-info { flex: 1; }
 .tier-btn-label { font-size: 0.95rem; font-weight: 600; }
@@ -382,11 +344,8 @@ main {
 .tier-actions { display: flex; gap: 8px; margin-top: 8px; }
 
 .tier-stats {
-  margin-top: 24px;
-  padding: 16px;
-  background: var(--bg2);
-  border-radius: 12px;
-  border: 1px solid var(--border);
+  margin-top: 24px; padding: 16px; background: var(--bg2);
+  border-radius: 12px; border: 1px solid var(--border);
 }
 .tier-stats h4 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text3); margin-bottom: 12px; }
 .tier-stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -395,37 +354,18 @@ main {
 .tier-stat-val { font-family: var(--mono); font-size: 0.85rem; font-weight: 500; }
 
 /* ── SORT PHASE ── */
-.sort-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
-  gap: 16px;
-}
+.sort-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; gap: 16px; flex-shrink: 0; }
 .sort-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 4px; }
 .sort-meta { font-size: 0.82rem; color: var(--text2); display: flex; gap: 16px; flex-wrap: wrap; }
 .sort-meta span { display: flex; align-items: center; gap: 4px; }
 
-.mode-badge {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  font-family: var(--mono);
-  flex-shrink: 0;
-}
+.mode-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; font-family: var(--mono); flex-shrink: 0; }
 .mode-binary { background: rgba(255,107,107,0.15); color: #ff9999; border: 1px solid rgba(255,107,107,0.3); }
 .mode-five { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,232,122,0.3); }
 
 .rsi-bar-wrap {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px 16px;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;
 }
 .rsi-label { font-size: 0.8rem; color: var(--text2); white-space: nowrap; }
 .rsi-track { flex: 1; background: var(--bg2); height: 6px; border-radius: 3px; overflow: hidden; }
@@ -433,14 +373,34 @@ main {
 .rsi-val { font-family: var(--mono); font-size: 0.82rem; min-width: 60px; text-align: right; }
 .rsi-hint { font-size: 0.75rem; color: var(--text3); white-space: nowrap; }
 
-/* Binary compare */
+/* 🌟 수정: 이진/5단계 선택 모드 Flex 컨테이너 변경 */
+#binaryMode, #fiveStepMode {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* 중요: Flex 영역 내부 스크롤 및 비율 조정 허용 */
+}
+
 .binary-grid {
+  flex: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 24px; /* 여백 약간 넓힘 */
+  margin-bottom: 16px;
+  min-height: 0;
 }
-.cmp-card {
+
+.fiveStep-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 24px;
+  align-items: stretch; /* 아이템들을 위아래로 꽉 차게 */
+  margin-bottom: 16px;
+  min-height: 0;
+}
+
+.cmp-card, .fiveStep-card {
   background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: 18px;
@@ -449,97 +409,47 @@ main {
   transition: all 0.18s;
   display: flex;
   flex-direction: column;
+  height: 100%; /* 카드 높이를 그리드에 꽉 채움 */
 }
-.cmp-card:hover {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 8px 32px rgba(0,232,122,0.1);
-  transform: translateY(-3px);
-}
-.cmp-card:active { transform: translateY(0); }
-.cmp-img-wrap { position: relative; width: 100%; padding-bottom: 60%; overflow: hidden; flex-shrink: 0; }
-.cmp-img-wrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.cmp-body { padding: 16px; flex: 1; }
-.cmp-name {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 1rem;
-  line-height: 1.3;
-  margin-bottom: 4px;
-}
-.cmp-artist { font-size: 0.8rem; color: var(--text2); margin-bottom: 8px; }
-.cmp-elo {
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  color: var(--text3);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.cmp-elo-num { color: var(--accent); font-size: 0.85rem; }
-.binary-hint { text-align: center; font-size: 0.8rem; color: var(--text3); margin-bottom: 16px; }
 
-/* Five-step compare */
-.fiveStep-grid {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 16px;
-  align-items: center;
-  margin-bottom: 12px;
+.cmp-card:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 8px 32px rgba(0,232,122,0.1); transform: translateY(-3px); }
+.cmp-card:active { transform: translateY(0); }
+
+/* 🌟 수정: 이미지 영역을 화면 남은 공간에 유동적으로 꽉 채우도록 설정 */
+.cmp-img-wrap, .fiveStep-card-img { 
+  position: relative; 
+  width: 100%; 
+  aspect-ratio: 1 / 1; 
+  padding-bottom: 0 !important; 
+  flex-shrink: 0; 
+  overflow: hidden; 
 }
-@media (max-width: 640px) {
-  .fiveStep-grid { grid-template-columns: 1fr; }
-}
-.fiveStep-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  overflow: hidden;
+.cmp-img-wrap img, .fiveStep-card-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+.cmp-body, .fiveStep-card-body { 
+  padding: 16px; 
+  flex: 1; 
   display: flex;
   flex-direction: column;
+  justify-content: center; 
 }
-.fiveStep-card-img { position: relative; width: 100%; padding-bottom: 70%; overflow: hidden; }
-.fiveStep-card-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.fiveStep-card-body { padding: 14px; }
-.fiveStep-card-name {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 0.95rem;
-  margin-bottom: 3px;
-}
-.fiveStep-card-artist { font-size: 0.78rem; color: var(--text2); margin-bottom: 8px; }
-.fiveStep-card-elo { font-family: var(--mono); font-size: 0.8rem; color: var(--accent); }
+.cmp-name, .fiveStep-card-name { font-family: var(--serif); font-style: italic; font-size: 1rem; line-height: 1.3; margin-bottom: 4px; }
+.cmp-artist, .fiveStep-card-artist { font-size: 0.8rem; color: var(--text2); margin-bottom: 8px; }
+.cmp-elo, .fiveStep-card-elo { font-family: var(--mono); font-size: 0.78rem; color: var(--text3); display: flex; align-items: center; justify-content: space-between; }
+.cmp-elo-num { color: var(--accent); font-size: 0.85rem; }
+
+.binary-hint { text-align: center; font-size: 0.8rem; color: var(--text3); margin-bottom: 16px; flex-shrink: 0;}
 
 .five-btns {
   display: flex;
   flex-direction: column;
   gap: 7px;
   align-items: center;
+  justify-content: center; /* 추가: 버튼 그룹 세로 중앙 정렬 */
+  padding: 0 10px;
 }
-.five-vs {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  color: var(--text3);
-  text-align: center;
-  margin-bottom: 4px;
-  letter-spacing: 0.1em;
-}
-.five-btn {
-  width: 168px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--surface2);
-  color: var(--text);
-  font-family: var(--sans);
-  font-size: 0.82rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
+.five-vs { font-family: var(--mono); font-size: 0.75rem; color: var(--text3); text-align: center; margin-bottom: 4px; letter-spacing: 0.1em; }
+.five-btn { width: 168px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-family: var(--sans); font-size: 0.82rem; font-weight: 500; cursor: pointer; transition: all 0.15s; text-align: center; display: flex; align-items: center; justify-content: space-between; }
 .five-btn:hover { background: var(--surface3); border-color: var(--border2); }
 .five-btn:active { transform: scale(0.97); }
 .five-btn.btn-a-strong { border-left: 3px solid var(--t1); }
@@ -553,82 +463,32 @@ main {
 .five-btn.btn-b-strong:hover { background: rgba(255,214,10,0.06); }
 .five-btn-key { font-family: var(--mono); font-size: 0.7rem; color: var(--text3); }
 
-/* Sort embeds */
-.sort-embeds {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 20px;
-}
+.sort-embeds { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; flex-shrink: 0; }
 .embed-wrap iframe { display: block; border-radius: 10px; }
-
-.sort-footer { display: flex; gap: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+.sort-footer { display: flex; gap: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; flex-shrink: 0; }
 
 /* ── RANK PHASE ── */
-.rank-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
-  gap: 16px;
-}
+.rank-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; gap: 16px; }
 .rank-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
 .rank-meta { font-size: 0.82rem; color: var(--text2); }
 
-.tier-section-header {
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-  margin-top: 16px;
-}
+.tier-section-header { padding: 8px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; margin-top: 16px; }
 .tier-section-header:first-child { margin-top: 0; }
 .ts1 { background: var(--t1-dim); color: var(--t1); }
 .ts2 { background: var(--t2-dim); color: var(--t2); }
 .ts3 { background: var(--t3-dim); color: var(--t3); }
 
-.rank-item {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
-  transition: all 0.15s;
-}
+.rank-item { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; margin-bottom: 6px; transition: all 0.15s; }
 .rank-item:hover { border-color: var(--border2); background: var(--surface2); }
-.rank-num {
-  font-family: var(--mono);
-  font-size: 0.9rem;
-  color: var(--text3);
-  min-width: 36px;
-  text-align: right;
-}
+.rank-num { font-family: var(--mono); font-size: 0.9rem; color: var(--text3); min-width: 36px; text-align: right; }
 .rank-num.gold { color: #ffd60a; }
 .rank-num.silver { color: #b0bec5; }
 .rank-num.bronze { color: #ff8a65; }
 .rank-img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
 .rank-info { flex: 1; min-width: 0; }
-.rank-name {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 0.95rem;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+.rank-name { font-family: var(--serif); font-style: italic; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rank-artist { font-size: 0.78rem; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rank-tier {
-  padding: 2px 9px;
-  border-radius: 20px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  font-family: var(--mono);
-  flex-shrink: 0;
-}
+.rank-tier { padding: 2px 9px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; font-family: var(--mono); flex-shrink: 0; }
 .rt1 { background: var(--t1-dim); color: var(--t1); }
 .rt2 { background: var(--t2-dim); color: var(--t2); }
 .rt3 { background: var(--t3-dim); color: var(--t3); }
@@ -636,163 +496,23 @@ main {
 .rank-comps { font-family: var(--mono); font-size: 0.75rem; color: var(--text3); min-width: 32px; text-align: right; }
 
 /* ── TOAST ── */
-#toast {
-  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  background: var(--surface3);
-  border: 1px solid var(--border2);
-  border-radius: 10px;
-  padding: 10px 20px;
-  font-size: 0.875rem;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.25s;
-  z-index: 999;
-  white-space: nowrap;
-}
+#toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--surface3); border: 1px solid var(--border2); border-radius: 10px; padding: 10px 20px; font-size: 0.875rem; pointer-events: none; opacity: 0; transition: opacity 0.25s; z-index: 999; white-space: nowrap; }
 #toast.show { opacity: 1; }
 
-/* ── COMPLETE OVERLAY ── */
-.tier-complete {
-  text-align: center;
-  padding: 48px 24px;
-  animation: fadeIn 0.4s ease;
-}
+.tier-complete { text-align: center; padding: 48px 24px; animation: fadeIn 0.4s ease; }
 .tier-complete .big { font-size: 3.5rem; margin-bottom: 16px; }
 .tier-complete h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
 .tier-complete p { color: var(--text2); margin-bottom: 24px; }
-
 @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
 @keyframes slideIn { from { opacity:0; transform: scale(0.96); } to { opacity:1; transform: scale(1); } }
 .animate-in { animation: slideIn 0.2s ease; }
-
-/* Divider */
 .divider { height: 1px; background: var(--border); margin: 24px 0; }
 
-/* ── PWA / MOBILE ── */
-/* Touch: no 300ms delay, no callout */
-* { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-a, button { -webkit-touch-callout: none; }
-
-/* Safe area for notch / Dynamic Island / home bar */
-body {
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-}
-
-/* Top header: taller on standalone/PWA to clear status bar */
-@media (display-mode: standalone) {
-  #header {
-    padding-top: env(safe-area-inset-top);
-    height: calc(56px + env(safe-area-inset-top));
-  }
-}
-
-/* ── BOTTOM TAB BAR (mobile only) ── */
-#bottomNav {
-  display: none;
-}
-@media (max-width: 600px) {
-  /* Hide top nav on mobile */
-  .nav { display: none; }
-
-  /* Show bottom tab bar */
-  #bottomNav {
-    display: flex;
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    z-index: 200;
-    background: rgba(9,9,18,0.97);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border-top: 1px solid var(--border);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  .bnav-btn {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    padding: 10px 0;
-    border: none;
-    background: transparent;
-    color: var(--text3);
-    font-family: var(--sans);
-    font-size: 0.68rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: color 0.15s;
-    min-height: 56px;
-  }
-  .bnav-btn:disabled { opacity: 0.25; }
-  .bnav-btn.active { color: var(--accent); }
-  .bnav-btn svg { width: 22px; height: 22px; }
-  .bnav-indicator {
-    width: 4px; height: 4px;
-    border-radius: 50%;
-    background: var(--accent);
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-  .bnav-btn.active .bnav-indicator { opacity: 1; }
-
-  /* Push main content above bottom bar */
-  main { padding-bottom: calc(72px + env(safe-area-inset-bottom) + 16px); }
-
-  /* Larger touch targets for tier buttons */
-  .tier-btn { padding: 18px 16px; }
-  .tier-play-btn { width: 50px; height: 50px; }
-
-  /* Five-step buttons: full width on mobile */
-  .five-btn { width: 100%; max-width: 200px; }
-
-  /* Toast: above bottom nav */
-  #toast { bottom: calc(72px + env(safe-area-inset-bottom) + 12px); }
-
-  /* Sort footer: stack vertically */
-  .sort-footer { flex-direction: column; align-items: stretch; }
-  .sort-footer .btn-row { justify-content: stretch; }
-  .sort-footer .btn { flex: 1; justify-content: center; }
-
-  /* Compact header */
-  #header { padding: 0 16px; }
-  .logo-dot { display: none; }
-
-  /* Import drop zone smaller */
-  .drop-zone { padding: 40px 24px; }
-
-  /* Rank items: hide comps count on narrow screens */
-  .rank-comps { display: none; }
-}
-
-/* ── INSTALL BANNER ── */
-#installBanner {
-  display: none;
-  position: fixed;
-  bottom: calc(72px + env(safe-area-inset-bottom) + 8px);
-  left: 16px; right: 16px;
-  background: var(--surface2);
-  border: 1px solid var(--accent);
-  border-radius: 16px;
-  padding: 14px 16px;
-  z-index: 300;
-  flex-direction: column;
-  gap: 10px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-  animation: slideUp 0.3s ease;
-}
-@keyframes slideUp { from { transform: translateY(20px); opacity:0; } to { transform: translateY(0); opacity:1; } }
-#installBanner.show { display: flex; }
-.install-title { font-size: 0.9rem; font-weight: 600; color: var(--text); }
-.install-sub { font-size: 0.78rem; color: var(--text2); }
-.install-steps { font-size: 0.78rem; color: var(--text2); line-height: 1.8; }
-.install-row { display: flex; gap: 8px; }
-.install-dismiss {
-  background: transparent; border: 1px solid var(--border);
-  color: var(--text2); border-radius: 8px; padding: 7px 14px;
-  font-family: var(--sans); font-size: 0.8rem; cursor: pointer; flex: 1;
+/* 모바일 대응: 작은 화면에서는 다시 스크롤 허용 및 고정 비율 적용 */
+@media (max-width: 768px) {
+  main.sort-fullscreen { height: auto; min-height: calc(100vh - 56px); overflow: visible; }
+  .cmp-img-wrap, .fiveStep-card-img { padding-bottom: 80% !important; flex: none; }
+  .fiveStep-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -817,8 +537,6 @@ body {
 </div>
 
 <main>
-
-<!-- ═══ IMPORT ═══ -->
 <div class="phase active" id="phase-import">
   <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
     <div class="icon">🎵</div>
@@ -828,7 +546,6 @@ body {
     </p>
   </div>
   <input type="file" id="fileInput" accept=".json" style="display:none" onchange="onFileInput(event)">
-
   <div class="session-card" id="savedPanel" style="display:none">
     <div>
       <h3>💾 저장된 세션</h3>
@@ -841,23 +558,18 @@ body {
   </div>
 </div>
 
-<!-- ═══ TIER ═══ -->
 <div class="phase" id="phase-tier">
   <div class="progress-wrap"><div class="progress-fill" id="tierProgress"></div></div>
   <div class="progress-label">
     <span id="tierDone"></span>
     <span id="tierLeft"></span>
   </div>
-
   <div id="tierMain">
     <div class="tier-layout">
-      <!-- Left: track card -->
       <div>
         <div class="tier-cover-wrap" id="tierCard">
           <img id="tierImg" src="" alt="" class="tier-cover-img">
-          <!-- Spotify iFrame API mount - clipped but rendered -->
           <div class="spotify-api-mount"><div id="spotifyApiMount"></div></div>
-          <!-- Overlay mini player -->
           <div class="tier-cover-overlay">
             <div class="tier-eq-bars" id="tierEqBars">
               <span></span><span></span><span></span><span></span><span></span>
@@ -877,11 +589,8 @@ body {
           </div>
         </div>
       </div>
-
-      <!-- Right: buttons & stats -->
       <div>
         <h3 style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);margin-bottom:16px">티어 선택 (키보드: 1 / 2 / 3)</h3>
-
         <div class="tier-btns">
           <button class="tier-btn tier-btn-1" onclick="assignTier(1)">
             <div class="tier-btn-key">1</div>
@@ -908,13 +617,11 @@ body {
             <div class="tier-btn-init">≈1365</div>
           </button>
         </div>
-
         <div class="tier-actions">
           <button class="btn btn-outline btn-sm" id="undoBtn" onclick="undoTier()" disabled>↩ 되돌리기 (Z)</button>
           <button class="btn btn-ghost btn-sm" onclick="skipRemainingToTier2()" id="skipBtn" style="display:none">나머지 Tier 3으로 →</button>
           <button class="btn btn-outline btn-sm" onclick="exportJSON()" style="margin-left:auto">💾 저장</button>
         </div>
-
         <div class="tier-stats" id="tierStats">
           <h4>분류 현황</h4>
           <div class="tier-stat-row">
@@ -938,7 +645,6 @@ body {
       </div>
     </div>
   </div>
-
   <div class="tier-complete" id="tierComplete" style="display:none">
     <div class="big">🎉</div>
     <h2>티어 분류 완료!</h2>
@@ -947,7 +653,6 @@ body {
   </div>
 </div>
 
-<!-- ═══ SORT ═══ -->
 <div class="phase" id="phase-sort">
   <div class="sort-header">
     <div>
@@ -965,10 +670,9 @@ body {
     <span class="rsi-label">수렴 (RSI)</span>
     <div class="rsi-track"><div class="rsi-fill" id="rsiFill" style="width:0%;background:var(--danger)"></div></div>
     <span class="rsi-val" id="rsiValDisplay">—</span>
-    <span class="rsi-hint">목표: &lt;10점</span>
+    <span class="rsi-hint">목표: <10점</span>
   </div>
 
-  <!-- Binary Mode -->
   <div id="binaryMode">
     <div class="binary-grid animate-in" id="binaryGrid">
       <div class="cmp-card" id="cardA" onclick="choose(1.0)">
@@ -997,7 +701,6 @@ body {
     <div class="binary-hint">클릭하거나 <kbd style="font-family:var(--mono);background:var(--surface3);padding:1px 6px;border-radius:4px;font-size:0.75rem">←</kbd> / <kbd style="font-family:var(--mono);background:var(--surface3);padding:1px 6px;border-radius:4px;font-size:0.75rem">→</kbd> 키로 선택</div>
   </div>
 
-  <!-- Five-step Mode -->
   <div id="fiveStepMode" style="display:none">
     <div class="fiveStep-grid animate-in">
       <div class="fiveStep-card">
@@ -1009,7 +712,7 @@ body {
         </div>
       </div>
       <div class="five-btns">
-        <div class="five-vs">A &nbsp;&nbsp;VS&nbsp;&nbsp; B</div>
+        <div class="five-vs">A   VS   B</div>
         <button class="five-btn btn-a-strong" onclick="choose(1.0)"><span>A가 훨씬 좋다</span><span class="five-btn-key">1</span></button>
         <button class="five-btn btn-a-mild"   onclick="choose(0.7)"><span>A가 조금 좋다</span><span class="five-btn-key">2</span></button>
         <button class="five-btn btn-tie"      onclick="choose(0.5)"><span>비슷하다</span><span class="five-btn-key">3</span></button>
@@ -1043,7 +746,6 @@ body {
   </div>
 </div>
 
-<!-- ═══ RANK ═══ -->
 <div class="phase" id="phase-rank">
   <div class="rank-header">
     <div>
@@ -1061,128 +763,7 @@ body {
 </main>
 <div id="toast"></div>
 
-<!-- ── BOTTOM TAB BAR (mobile) ── -->
-<nav id="bottomNav">
-  <button class="bnav-btn active" id="bnav-import" onclick="goPhase('import')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-    </svg>
-    <div class="bnav-indicator"></div>
-    불러오기
-  </button>
-  <button class="bnav-btn" id="bnav-tier" onclick="goPhase('tier')" disabled>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-    </svg>
-    <div class="bnav-indicator"></div>
-    티어 분류
-  </button>
-  <button class="bnav-btn" id="bnav-sort" onclick="goPhase('sort')" disabled>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-      <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-    </svg>
-    <div class="bnav-indicator"></div>
-    비교 정렬
-  </button>
-  <button class="bnav-btn" id="bnav-rank" onclick="goPhase('rank')" disabled>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="18 20 18 10"/><polyline points="12 20 12 4"/><polyline points="6 20 6 14"/>
-    </svg>
-    <div class="bnav-indicator"></div>
-    랭킹
-  </button>
-</nav>
-
-<!-- ── iOS INSTALL GUIDE BANNER ── -->
-<div id="installBanner">
-  <div>
-    <div class="install-title">📱 홈 화면에 추가하기</div>
-    <div class="install-steps">
-      1. Safari 하단 <strong>공유 버튼</strong> (↑) 탭<br>
-      2. <strong>"홈 화면에 추가"</strong> 선택<br>
-      3. 앱처럼 전체화면으로 사용 가능!
-    </div>
-  </div>
-  <div class="install-row">
-    <button class="install-dismiss" onclick="dismissInstall()">닫기</button>
-  </div>
-</div>
-
 <script>
-// ══════════════════════════════════════════════
-//  PWA: SERVICE WORKER (single-file inline)
-// ══════════════════════════════════════════════
-if ('serviceWorker' in navigator) {
-  const swCode = `
-const CACHE = 'elo-sorter-v1';
-const PRECACHE = [
-  'https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap',
-];
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)).catch(()=>{}));
-  self.skipWaiting();
-});
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))
-  ));
-  self.clients.claim();
-});
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const net = fetch(e.request).then(r => {
-        const clone = r.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone)).catch(()=>{});
-        return r;
-      }).catch(() => cached);
-      return cached || net;
-    })
-  );
-});
-  `;
-  const blob = new Blob([swCode], { type: 'application/javascript' });
-  const swUrl = URL.createObjectURL(blob);
-  // Note: blob-origin SW won't intercept page fetches, but caches fonts/assets
-  navigator.serviceWorker.register(swUrl).catch(() => {});
-}
-
-// ══════════════════════════════════════════════
-//  PWA: GENERATE CANVAS TOUCH ICON
-// ══════════════════════════════════════════════
-(function generateIcon() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 180;
-  const ctx = c.getContext('2d');
-  // Background
-  const grad = ctx.createLinearGradient(0, 0, 180, 180);
-  grad.addColorStop(0, '#0f0f1a');
-  grad.addColorStop(1, '#090912');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.roundRect(0, 0, 180, 180, 36);
-  ctx.fill();
-  // Green accent bar
-  ctx.fillStyle = '#00e87a';
-  ctx.fillRect(20, 80, 140, 4);
-  ctx.globalAlpha = 0.5;
-  ctx.fillRect(20, 96, 90, 4);
-  ctx.globalAlpha = 0.25;
-  ctx.fillRect(20, 112, 60, 4);
-  ctx.globalAlpha = 1;
-  // Text
-  ctx.fillStyle = '#00e87a';
-  ctx.font = 'bold 28px monospace';
-  ctx.fillText('ELO', 20, 68);
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  ctx.font = '14px monospace';
-  ctx.fillText('SORTER', 20, 136);
-  const url = c.toDataURL('image/png');
-  document.getElementById('appleIcon').href = url;
-})();
-
 // ══════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════
@@ -1319,25 +900,25 @@ function computeRSI() {
 // ══════════════════════════════════════════════
 function goPhase(name) {
   document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn, .bnav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`phase-${name}`).classList.add('active');
-  // Sync both top nav and bottom nav
-  const topBtn = document.getElementById(`tab-${name}`);
-  const botBtn = document.getElementById(`bnav-${name}`);
-  if (topBtn) topBtn.classList.add('active');
-  if (botBtn) botBtn.classList.add('active');
+  document.getElementById(`tab-${name}`).classList.add('active');
+  
+  // 🌟 추가: 비교정렬 탭일 때만 main에 full-screen 속성 부여
+  const mainEl = document.querySelector('main');
+  if (name === 'sort') {
+    mainEl.classList.add('sort-fullscreen');
+  } else {
+    mainEl.classList.remove('sort-fullscreen');
+  }
+
   if (name === 'tier')   renderTier();
   if (name === 'sort')   renderSort();
   if (name === 'rank')   renderRank();
 }
 
 function enableNav() {
-  ['tier','sort','rank'].forEach(id => {
-    const t = document.getElementById(`tab-${id}`);
-    const b = document.getElementById(`bnav-${id}`);
-    if (t) t.disabled = false;
-    if (b) b.disabled = false;
-  });
+  ['tier','sort','rank'].forEach(id => document.getElementById(`tab-${id}`).disabled = false);
 }
 
 // ══════════════════════════════════════════════
@@ -1435,11 +1016,7 @@ function renderTier() {
   if (untiered.length === 0) {
     document.getElementById('tierMain').style.display = 'none';
     document.getElementById('tierComplete').style.display = 'block';
-    const t1 = tracks.filter(t=>t.tier===1).length;
-    const t2 = tracks.filter(t=>t.tier===2).length;
-    const t3 = tracks.filter(t=>t.tier===3).length;
-    document.getElementById('tierCompleteMsg').textContent =
-      `최애: ${t1}곡 · 선호: ${t2}곡 · 보통: ${t3}곡`;
+    document.getElementById('tierCompleteMsg').textContent = `최애: ${c1}곡 · 선호: ${c2}곡 · 보통: ${c3}곡`;
     return;
   }
   document.getElementById('tierMain').style.display = 'block';
@@ -1578,6 +1155,7 @@ function renderRank() {
 
   let curTier = null;
   let tierCount = 0;
+
   const allSorted = [...tracks].sort((a,b) => b.rating - a.rating);
   const globalRank = {};
   allSorted.forEach((t, i) => globalRank[t.id] = i + 1);
@@ -1593,6 +1171,7 @@ function renderRank() {
       list.appendChild(hdr);
     }
     tierCount++;
+
     const grank = globalRank[track.id];
     const div = document.createElement('div');
     div.className = 'rank-item';
@@ -1671,31 +1250,9 @@ function toast(msg) {
 }
 
 // ══════════════════════════════════════════════
-//  iOS INSTALL BANNER
-// ══════════════════════════════════════════════
-function dismissInstall() {
-  document.getElementById('installBanner').classList.remove('show');
-  localStorage.setItem('installDismissed', '1');
-}
-
-function maybeShowInstallBanner() {
-  // Show on iOS Safari when NOT in standalone mode
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const isStandalone = window.navigator.standalone === true ||
-    window.matchMedia('(display-mode: standalone)').matches;
-  const dismissed = localStorage.getItem('installDismissed');
-  if (isIOS && !isStandalone && !dismissed) {
-    setTimeout(() => {
-      document.getElementById('installBanner').classList.add('show');
-    }, 3000);
-  }
-}
-
-// ══════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════
 window.addEventListener('load', () => {
-  maybeShowInstallBanner();
   const raw = localStorage.getItem('eloState');
   if (!raw) return;
   try {
@@ -1708,6 +1265,5 @@ window.addEventListener('load', () => {
   } catch {}
 });
 </script>
--e 
 </body>
 </html>
