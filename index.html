@@ -6,7 +6,20 @@
 <title>ELO 음악 정렬기</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
-<script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
+<!--
+  ╔══════════════════════════════════════════════════════════╗
+  ║  Supabase 테이블 생성 SQL (최초 1회 실행)               ║
+  ║                                                          ║
+  ║  CREATE TABLE elo_state (                               ║
+  ║    id   TEXT PRIMARY KEY,                               ║
+  ║    data JSONB,                                          ║
+  ║    updated_at TIMESTAMPTZ DEFAULT NOW()                 ║
+  ║  );                                                     ║
+  ║  ALTER TABLE elo_state ENABLE ROW LEVEL SECURITY;       ║
+  ║  CREATE POLICY "allow_all" ON elo_state                 ║
+  ║    FOR ALL USING (true) WITH CHECK (true);              ║
+  ╚══════════════════════════════════════════════════════════╝
+-->
 <style>
 :root {
   --bg: #090912;
@@ -19,6 +32,7 @@
   --accent: #00e87a;
   --accent2: #00b85f;
   --accent-dim: rgba(0,232,122,0.12);
+  --spotify: #1ed760;
   --t1: #ffd60a;
   --t1-dim: rgba(255,214,10,0.12);
   --t2: #4cc9f0;
@@ -45,8 +59,6 @@ body {
   flex-direction: column;
   overflow-x: hidden;
 }
-
-/* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg2); }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
@@ -57,9 +69,9 @@ body {
   background: rgba(9,9,18,0.92);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
-  padding: 0 24px;
+  padding: 0 16px;
   height: 56px;
-  display: flex; align-items: center; gap: 20px;
+  display: flex; align-items: center; gap: 12px;
 }
 .logo {
   font-family: var(--mono);
@@ -68,9 +80,9 @@ body {
   letter-spacing: 0.05em;
   display: flex; align-items: center; gap: 8px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-
 .nav {
   display: flex; gap: 2px;
   margin-left: auto;
@@ -99,14 +111,40 @@ body {
 .nav-btn:not(:disabled):hover { color: var(--text); background: var(--surface2); }
 .nav-btn.active { background: var(--surface2); color: var(--accent); border-color: var(--border); }
 .nav-btn .step-num {
-  width: 18px; height: 18px;
-  border-radius: 50%;
+  width: 18px; height: 18px; border-radius: 50%;
   background: var(--border);
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.7rem;
-  font-family: var(--mono);
+  font-size: 0.7rem; font-family: var(--mono);
 }
 .nav-btn.active .step-num { background: var(--accent); color: #000; }
+
+/* sync button in header */
+#syncBtn {
+  display: none;
+  align-items: center; gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text2);
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+#syncBtn:hover { background: var(--surface2); color: var(--text); }
+#syncBtn.syncing { color: var(--accent); border-color: rgba(0,232,122,0.4); }
+#syncBtn .sync-icon { transition: transform 0.8s; }
+#syncBtn.syncing .sync-icon { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.sync-badge {
+  background: var(--accent); color: #000;
+  border-radius: 10px; padding: 1px 6px;
+  font-size: 0.7rem; font-weight: 700; font-family: var(--mono);
+}
 
 /* ── MAIN ── */
 main {
@@ -116,68 +154,22 @@ main {
   margin: 0 auto;
   padding: 32px 24px 80px;
 }
-
-/* 🌟 추가: 비교 정렬 화면을 가득 채우기 위한 특수 클래스 */
 main.sort-fullscreen {
   max-width: 60%;
   margin: 0 auto;
-  height: calc(100vh - 56px); /* 헤더를 제외한 전체 화면 높이 */
+  height: calc(100vh - 56px);
   padding: 24px;
   display: flex;
   flex-direction: column;
-  overflow-y: auto; /* 전체화면 시 이중 스크롤 방지 */
+  overflow-y: auto;
 }
-
 .phase { display: none; }
 .phase.active { display: block; }
-
-/* 🌟 수정: 비교 정렬 페이지만 flex로 세로 영역을 차지하게 설정 */
-#phase-sort.active { 
-  display: flex; 
-  flex-direction: column; 
-  height: 100%; 
-}
-
-/* ── IMPORT PHASE ── */
-.drop-zone {
-  border: 1.5px dashed var(--border2);
-  border-radius: 20px;
-  padding: 64px 40px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: 20px;
-  background: var(--bg2);
-}
-.drop-zone:hover, .drop-zone.dragging {
-  border-color: var(--accent);
-  background: var(--accent-dim);
-}
-.drop-zone .icon { font-size: 3rem; margin-bottom: 16px; }
-.drop-zone h2 { font-size: 1.2rem; font-weight: 600; margin-bottom: 8px; }
-.drop-zone p { color: var(--text2); font-size: 0.875rem; line-height: 1.6; }
-.drop-zone code {
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  background: var(--surface3);
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: var(--text2);
-}
-
-.session-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 20px 24px;
+#phase-sort.active {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
+  flex-direction: column;
+  height: 100%;
 }
-.session-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
-.session-card p { font-size: 0.82rem; color: var(--text2); }
 
 /* ── BUTTONS ── */
 .btn {
@@ -192,138 +184,219 @@ main.sort-fullscreen {
   transition: all 0.15s;
   white-space: nowrap;
 }
-.btn-green { background: var(--accent); color: #000; border-color: var(--accent); }
+.btn-green  { background: var(--accent); color: #000; border-color: var(--accent); }
 .btn-green:hover { background: var(--accent2); border-color: var(--accent2); }
+.btn-spotify { background: var(--spotify); color: #000; border-color: var(--spotify); }
+.btn-spotify:hover { filter: brightness(0.9); }
 .btn-outline { background: transparent; color: var(--text2); border-color: var(--border); }
 .btn-outline:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
 .btn-ghost { background: transparent; color: var(--text3); border-color: transparent; }
 .btn-ghost:hover { color: var(--text2); background: var(--surface); }
 .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
 .btn-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text3);
+  margin-bottom: 16px;
+  font-family: var(--mono);
+}
+.card-row {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ── IMPORT / CONNECT PHASE ── */
+.connect-hero {
+  text-align: center;
+  padding: 64px 24px;
+}
+.connect-hero .big-icon { font-size: 3rem; margin-bottom: 20px; }
+.connect-hero h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; }
+.connect-hero p { color: var(--text2); font-size: 0.9rem; line-height: 1.7; margin-bottom: 28px; max-width: 380px; margin-left: auto; margin-right: auto; }
+
+.spotify-user-row {
+  display: flex; align-items: center; gap: 12px;
+}
+.spotify-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  object-fit: cover; background: var(--surface3);
+  flex-shrink: 0;
+}
+.spotify-user-name { font-weight: 600; font-size: 0.95rem; }
+.spotify-user-sub  { font-size: 0.8rem; color: var(--text2); margin-top: 2px; }
+
+/* Playlist list */
+.playlist-list {
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: 360px; overflow-y: auto;
+  margin-top: 12px;
+}
+.playlist-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+}
+.playlist-item:hover { border-color: var(--accent); background: var(--accent-dim); }
+.playlist-item.selected { border-color: var(--accent); background: var(--accent-dim); }
+.playlist-img {
+  width: 44px; height: 44px; border-radius: 6px;
+  object-fit: cover; background: var(--surface3); flex-shrink: 0;
+}
+.playlist-name { font-size: 0.9rem; font-weight: 600; }
+.playlist-sub  { font-size: 0.78rem; color: var(--text2); margin-top: 2px; }
+
+/* source tabs */
+.source-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.source-tab {
+  padding: 7px 16px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: transparent; color: var(--text2);
+  font-family: var(--sans); font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.source-tab:hover { background: var(--surface2); color: var(--text); }
+.source-tab.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+/* new tracks banner */
+.new-tracks-banner {
+  display: none;
+  background: rgba(0,232,122,0.08);
+  border: 1.5px solid rgba(0,232,122,0.35);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  align-items: center; gap: 12px;
+}
+.new-tracks-banner.show { display: flex; }
+.new-tracks-count { font-family: var(--mono); font-size: 1.4rem; font-weight: 700; color: var(--accent); flex-shrink: 0; }
+.new-tracks-text { flex: 1; font-size: 0.88rem; line-height: 1.5; }
+
+/* Supabase status */
+.cloud-status {
+  font-size: 0.78rem; color: var(--text3);
+  font-family: var(--mono);
+  display: flex; align-items: center; gap: 6px;
+}
+.cloud-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text3);
+  flex-shrink: 0;
+}
+.cloud-dot.ok { background: var(--accent); }
+.cloud-dot.err { background: var(--danger); }
+
+/* settings modal */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(4px);
+  align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  padding: 28px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; }
+.modal p  { font-size: 0.85rem; color: var(--text2); margin-bottom: 24px; line-height: 1.6; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 0.8rem; color: var(--text2); margin-bottom: 6px; font-family: var(--mono); }
+.field input {
+  width: 100%; padding: 10px 14px;
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 8px; color: var(--text); font-family: var(--mono); font-size: 0.85rem;
+  outline: none; transition: border-color 0.15s;
+}
+.field input:focus { border-color: var(--accent); }
+.field .hint { font-size: 0.75rem; color: var(--text3); margin-top: 5px; line-height: 1.5; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
 
 /* ── PROGRESS BAR ── */
-.progress-wrap {
-  background: var(--surface2);
-  border-radius: 99px;
-  height: 4px;
-  overflow: hidden;
-  margin-bottom: 12px;
-}
-.progress-fill {
-  height: 100%;
-  border-radius: 99px;
-  background: var(--accent);
-  transition: width 0.4s ease;
-}
-.progress-label {
-  font-size: 0.8rem;
-  color: var(--text2);
-  margin-bottom: 24px;
-  display: flex;
-  justify-content: space-between;
-}
+.progress-wrap { background: var(--surface2); border-radius: 99px; height: 4px; overflow: hidden; margin-bottom: 12px; }
+.progress-fill { height: 100%; border-radius: 99px; background: var(--accent); transition: width 0.4s ease; }
+.progress-label { font-size: 0.8rem; color: var(--text2); margin-bottom: 24px; display: flex; justify-content: space-between; }
 
 /* ── TIER PHASE ── */
-.tier-layout {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 32px;
-  align-items: start;
-}
-@media (max-width: 720px) {
-  .tier-layout { grid-template-columns: 1fr; }
-}
+.tier-layout { display: grid; grid-template-columns: 320px 1fr; gap: 32px; align-items: start; }
+@media (max-width: 720px) { .tier-layout { grid-template-columns: 1fr; } }
 
 .tier-cover-wrap {
-  position: relative;
-  width: 100%;
-  padding-bottom: 100%;
-  border-radius: 20px;
-  overflow: hidden;
+  position: relative; width: 100%; padding-bottom: 100%;
+  border-radius: 20px; overflow: hidden;
   background: var(--surface);
   box-shadow: 0 12px 48px rgba(0,0,0,0.6);
-  cursor: default;
 }
 .tier-cover-img {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;
-  transition: transform 0.5s ease;
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; transition: transform 0.5s ease;
 }
 .tier-cover-wrap:hover .tier-cover-img { transform: scale(1.04); }
-
-.spotify-api-mount {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 0;
-  overflow: hidden;
-  z-index: 0;
-}
-
+.spotify-api-mount { position: absolute; bottom: 0; left: 0; right: 0; height: 0; overflow: hidden; z-index: 0; }
 .tier-cover-overlay {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
+  position: absolute; bottom: 0; left: 0; right: 0;
   padding: 56px 18px 18px;
-  background: linear-gradient(to top,
-    rgba(0,0,0,0.95) 0%,
-    rgba(0,0,0,0.75) 45%,
-    transparent 100%);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 2;
+  background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.75) 45%, transparent 100%);
+  display: flex; flex-direction: column; gap: 10px; z-index: 2;
 }
-
-.tier-eq-bars {
-  display: none;
-  align-items: flex-end;
-  gap: 3px;
-  height: 16px;
-  margin-bottom: 2px;
-}
+.tier-eq-bars { display: none; align-items: flex-end; gap: 3px; height: 16px; margin-bottom: 2px; }
 .tier-eq-bars.playing { display: flex; }
-.tier-eq-bars span {
-  width: 3px;
-  border-radius: 2px;
-  background: var(--accent);
-  min-height: 3px;
-  animation: eqPulse 0.7s ease-in-out infinite alternate;
-}
-.tier-eq-bars span:nth-child(1) { animation-duration: 0.65s; animation-delay: 0s; }
+.tier-eq-bars span { width: 3px; border-radius: 2px; background: var(--accent); min-height: 3px; animation: eqPulse 0.7s ease-in-out infinite alternate; }
+.tier-eq-bars span:nth-child(1) { animation-duration: 0.65s; }
 .tier-eq-bars span:nth-child(2) { animation-duration: 0.8s;  animation-delay: 0.12s; }
 .tier-eq-bars span:nth-child(3) { animation-duration: 0.55s; animation-delay: 0.06s; }
 .tier-eq-bars span:nth-child(4) { animation-duration: 0.9s;  animation-delay: 0.2s; }
 .tier-eq-bars span:nth-child(5) { animation-duration: 0.7s;  animation-delay: 0.04s; }
-@keyframes eqPulse {
-  from { height: 3px; opacity: 0.6; }
-  to   { height: 14px; opacity: 1; }
-}
+@keyframes eqPulse { from { height: 3px; opacity: 0.6; } to { height: 14px; opacity: 1; } }
 
 .tier-overlay-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
 .tier-overlay-text { flex: 1; min-width: 0; }
-.tier-overlay-name {
-  font-family: var(--serif); font-style: italic; font-size: 1.15rem; line-height: 1.3;
-  color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  margin-bottom: 3px; text-shadow: 0 1px 8px rgba(0,0,0,0.8);
-}
-.tier-overlay-artist {
-  font-size: 0.82rem; color: rgba(255,255,255,0.65); white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px;
-}
-.tier-overlay-album {
-  font-size: 0.73rem; color: rgba(255,255,255,0.35); white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
-}
-
+.tier-overlay-name { font-family: var(--serif); font-style: italic; font-size: 1.15rem; line-height: 1.3; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; text-shadow: 0 1px 8px rgba(0,0,0,0.8); }
+.tier-overlay-artist { font-size: 0.82rem; color: rgba(255,255,255,0.65); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px; }
+.tier-overlay-album  { font-size: 0.73rem; color: rgba(255,255,255,0.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tier-play-btn {
   width: 42px; height: 42px; border-radius: 50%; border: none;
   background: var(--accent); color: #000; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; transition: all 0.18s; box-shadow: 0 4px 18px rgba(0,232,122,0.45);
+  flex-shrink: 0; transition: all 0.18s;
+  box-shadow: 0 4px 18px rgba(0,232,122,0.45);
 }
 .tier-play-btn:hover  { transform: scale(1.12); background: #1ed760; }
 .tier-play-btn:active { transform: scale(0.93); }
-.tier-play-btn svg    { pointer-events: none; }
+
+/* new track badge */
+.new-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(0,232,122,0.15); border: 1px solid rgba(0,232,122,0.4);
+  border-radius: 6px; padding: 2px 8px;
+  font-size: 0.72rem; font-weight: 700; color: var(--accent);
+  font-family: var(--mono); margin-bottom: 8px;
+}
 
 .tier-btns { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
 .tier-btn {
@@ -338,200 +411,134 @@ main.sort-fullscreen {
 .tier-btn-2:hover { background: var(--t2-dim); border-color: var(--t2); }
 .tier-btn-3 { border-color: rgba(124,143,166,0.3); color: var(--t3); }
 .tier-btn-3:hover { background: var(--t3-dim); border-color: var(--t3); }
-.tier-btn-key {
-  width: 28px; height: 28px; border-radius: 6px; background: rgba(255,255,255,0.06);
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--mono); font-size: 0.8rem; flex-shrink: 0;
-}
+.tier-btn-key { width: 28px; height: 28px; border-radius: 6px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 0.8rem; flex-shrink: 0; }
 .tier-btn-info { flex: 1; }
 .tier-btn-label { font-size: 0.95rem; font-weight: 600; }
-.tier-btn-sub { font-size: 0.78rem; opacity: 0.65; margin-top: 2px; }
-.tier-btn-init { font-family: var(--mono); font-size: 0.8rem; opacity: 0.5; margin-left: auto; }
-
+.tier-btn-sub   { font-size: 0.78rem; opacity: 0.65; margin-top: 2px; }
+.tier-btn-init  { font-family: var(--mono); font-size: 0.8rem; opacity: 0.5; margin-left: auto; }
 .tier-actions { display: flex; gap: 8px; margin-top: 8px; }
-
-.tier-stats {
-  margin-top: 24px; padding: 16px; background: var(--bg2);
-  border-radius: 12px; border: 1px solid var(--border);
-}
+.tier-stats { margin-top: 24px; padding: 16px; background: var(--bg2); border-radius: 12px; border: 1px solid var(--border); }
 .tier-stats h4 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text3); margin-bottom: 12px; }
 .tier-stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .tier-stat-row:last-child { margin-bottom: 0; }
 .tier-stat-label { font-size: 0.82rem; }
-.tier-stat-val { font-family: var(--mono); font-size: 0.85rem; font-weight: 500; }
+.tier-stat-val   { font-family: var(--mono); font-size: 0.85rem; font-weight: 500; }
 
 /* ── SORT PHASE ── */
 .sort-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; gap: 16px; flex-shrink: 0; }
-.sort-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 4px; }
-.sort-meta { font-size: 0.82rem; color: var(--text2); display: flex; gap: 16px; flex-wrap: wrap; }
-.sort-meta span { display: flex; align-items: center; gap: 4px; }
-
-.mode-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; font-family: var(--mono); flex-shrink: 0; }
+.sort-title  { font-size: 1.05rem; font-weight: 600; margin-bottom: 4px; }
+.sort-meta   { font-size: 0.82rem; color: var(--text2); display: flex; gap: 16px; flex-wrap: wrap; }
+.mode-badge  { padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; font-family: var(--mono); flex-shrink: 0; }
 .mode-binary { background: rgba(255,107,107,0.15); color: #ff9999; border: 1px solid rgba(255,107,107,0.3); }
-.mode-five { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,232,122,0.3); }
+.mode-five   { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,232,122,0.3); }
 
-.rsi-bar-wrap {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-  padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;
-}
+.rsi-bar-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .rsi-label { font-size: 0.8rem; color: var(--text2); white-space: nowrap; }
 .rsi-track { flex: 1; background: var(--bg2); height: 6px; border-radius: 3px; overflow: hidden; }
-.rsi-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease, background 0.6s; }
-.rsi-val { font-family: var(--mono); font-size: 0.82rem; min-width: 60px; text-align: right; }
-.rsi-hint { font-size: 0.75rem; color: var(--text3); white-space: nowrap; }
+.rsi-fill  { height: 100%; border-radius: 3px; transition: width 0.6s ease, background 0.6s; }
+.rsi-val   { font-family: var(--mono); font-size: 0.82rem; min-width: 60px; text-align: right; }
+.rsi-hint  { font-size: 0.75rem; color: var(--text3); white-space: nowrap; }
 
-/* 🌟 수정: 이진/5단계 선택 모드 Flex 컨테이너 변경 */
-#binaryMode, #fiveStepMode {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0; /* 중요: Flex 영역 내부 스크롤 및 비율 조정 허용 */
-}
-
+#binaryMode, #fiveStepMode { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .binary-grid {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px; /* 여백 약간 넓힘 */
-  margin-bottom: 16px;
-  min-height: 0;
+  flex: 1; display: grid; grid-template-columns: 1fr 1fr;
+  gap: 24px; margin-bottom: 16px; min-height: 0;
 }
-
 .fiveStep-grid {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 24px;
-  align-items: stretch; /* 아이템들을 위아래로 꽉 차게 */
-  margin-bottom: 16px;
-  min-height: 0;
+  flex: 1; display: grid; grid-template-columns: 1fr auto 1fr;
+  gap: 24px; align-items: stretch; margin-bottom: 16px; min-height: 0;
 }
-
 .cmp-card, .fiveStep-card {
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-radius: 18px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: all 0.18s;
-  display: flex;
-  flex-direction: column;
-  height: 100%; /* 카드 높이를 그리드에 꽉 채움 */
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 18px; overflow: hidden; cursor: pointer;
+  transition: all 0.18s; display: flex; flex-direction: column; height: 100%;
 }
-
 .cmp-card:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 8px 32px rgba(0,232,122,0.1); transform: translateY(-3px); }
 .cmp-card:active { transform: translateY(0); }
-
-/* 🌟 수정: 이미지 영역을 화면 남은 공간에 유동적으로 꽉 채우도록 설정 */
-.cmp-img-wrap, .fiveStep-card-img { 
-  position: relative; 
-  width: 100%; 
-  aspect-ratio: 1 / 1; 
-  padding-bottom: 0 !important; 
-  flex-shrink: 0; 
-  overflow: hidden; 
+.cmp-img-wrap, .fiveStep-card-img {
+  position: relative; width: 100%; aspect-ratio: 1 / 1;
+  padding-bottom: 0 !important; flex-shrink: 0; overflow: hidden;
 }
 .cmp-img-wrap img, .fiveStep-card-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-
-.cmp-body, .fiveStep-card-body { 
-  padding: 16px; 
-  flex: 1; 
-  display: flex;
-  flex-direction: column;
-  justify-content: center; 
-}
-.cmp-name, .fiveStep-card-name { font-family: var(--serif); font-style: italic; font-size: 1rem; line-height: 1.3; margin-bottom: 4px; }
+.cmp-body, .fiveStep-card-body { padding: 16px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.cmp-name, .fiveStep-card-name   { font-family: var(--serif); font-style: italic; font-size: 1rem; line-height: 1.3; margin-bottom: 4px; }
 .cmp-artist, .fiveStep-card-artist { font-size: 0.8rem; color: var(--text2); margin-bottom: 8px; }
 .cmp-elo, .fiveStep-card-elo { font-family: var(--mono); font-size: 0.78rem; color: var(--text3); display: flex; align-items: center; justify-content: space-between; }
 .cmp-elo-num { color: var(--accent); font-size: 0.85rem; }
+.binary-hint { text-align: center; font-size: 0.8rem; color: var(--text3); margin-bottom: 16px; flex-shrink: 0; }
 
-.binary-hint { text-align: center; font-size: 0.8rem; color: var(--text3); margin-bottom: 16px; flex-shrink: 0;}
-
-.five-btns {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  align-items: center;
-  justify-content: center; /* 추가: 버튼 그룹 세로 중앙 정렬 */
-  padding: 0 10px;
-}
-.five-vs { font-family: var(--mono); font-size: 0.75rem; color: var(--text3); text-align: center; margin-bottom: 4px; letter-spacing: 0.1em; }
-.five-btn { width: 168px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-family: var(--sans); font-size: 0.82rem; font-weight: 500; cursor: pointer; transition: all 0.15s; text-align: center; display: flex; align-items: center; justify-content: space-between; }
+.five-btns { display: flex; flex-direction: column; gap: 7px; align-items: center; justify-content: center; padding: 0 10px; }
+.five-vs   { font-family: var(--mono); font-size: 0.75rem; color: var(--text3); text-align: center; margin-bottom: 4px; letter-spacing: 0.1em; }
+.five-btn  { width: 168px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-family: var(--sans); font-size: 0.82rem; font-weight: 500; cursor: pointer; transition: all 0.15s; text-align: center; display: flex; align-items: center; justify-content: space-between; }
 .five-btn:hover { background: var(--surface3); border-color: var(--border2); }
 .five-btn:active { transform: scale(0.97); }
 .five-btn.btn-a-strong { border-left: 3px solid var(--t1); }
-.five-btn.btn-a-strong:hover { border-left-color: var(--t1); background: rgba(255,214,10,0.06); }
-.five-btn.btn-a-mild { border-left: 3px solid var(--t2); }
-.five-btn.btn-a-mild:hover { background: rgba(76,201,240,0.06); }
-.five-btn.btn-tie { border-left: 3px solid var(--text3); }
-.five-btn.btn-b-mild { border-right: 3px solid var(--t2); border-left: none; }
-.five-btn.btn-b-mild:hover { background: rgba(76,201,240,0.06); }
+.five-btn.btn-a-mild   { border-left: 3px solid var(--t2); }
+.five-btn.btn-tie      { border-left: 3px solid var(--text3); }
+.five-btn.btn-b-mild   { border-right: 3px solid var(--t2); border-left: none; }
 .five-btn.btn-b-strong { border-right: 3px solid var(--t1); border-left: none; }
-.five-btn.btn-b-strong:hover { background: rgba(255,214,10,0.06); }
 .five-btn-key { font-family: var(--mono); font-size: 0.7rem; color: var(--text3); }
 
 .sort-embeds { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; flex-shrink: 0; }
 .embed-wrap iframe { display: block; border-radius: 10px; }
 .sort-footer { display: flex; gap: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; flex-shrink: 0; }
 
-@media (max-width: 768px) {
-  .sort-embeds { grid-template-columns: 1fr; gap: 8px; }
-  .sort-embeds iframe { height: 152px !important; }
-}
-
 /* ── RANK PHASE ── */
 .rank-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; gap: 16px; }
-.rank-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
-.rank-meta { font-size: 0.82rem; color: var(--text2); }
-
+.rank-title  { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+.rank-meta   { font-size: 0.82rem; color: var(--text2); }
 .tier-section-header { padding: 8px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; margin-top: 16px; }
 .tier-section-header:first-child { margin-top: 0; }
 .ts1 { background: var(--t1-dim); color: var(--t1); }
 .ts2 { background: var(--t2-dim); color: var(--t2); }
 .ts3 { background: var(--t3-dim); color: var(--t3); }
-
 .rank-item { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; margin-bottom: 6px; transition: all 0.15s; }
 .rank-item:hover { border-color: var(--border2); background: var(--surface2); }
-.rank-num { font-family: var(--mono); font-size: 0.9rem; color: var(--text3); min-width: 36px; text-align: right; }
-.rank-num.gold { color: #ffd60a; }
+.rank-num  { font-family: var(--mono); font-size: 0.9rem; color: var(--text3); min-width: 36px; text-align: right; }
+.rank-num.gold   { color: #ffd60a; }
 .rank-num.silver { color: #b0bec5; }
 .rank-num.bronze { color: #ff8a65; }
-.rank-img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.rank-img  { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
 .rank-info { flex: 1; min-width: 0; }
-.rank-name { font-family: var(--serif); font-style: italic; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-name   { font-family: var(--serif); font-style: italic; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rank-artist { font-size: 0.78rem; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rank-tier { padding: 2px 9px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; font-family: var(--mono); flex-shrink: 0; }
 .rt1 { background: var(--t1-dim); color: var(--t1); }
 .rt2 { background: var(--t2-dim); color: var(--t2); }
 .rt3 { background: var(--t3-dim); color: var(--t3); }
-.rank-elo { font-family: var(--mono); font-size: 0.88rem; color: var(--accent); min-width: 52px; text-align: right; }
+.rank-elo   { font-family: var(--mono); font-size: 0.88rem; color: var(--accent); min-width: 52px; text-align: right; }
 .rank-comps { font-family: var(--mono); font-size: 0.75rem; color: var(--text3); min-width: 32px; text-align: right; }
 
-/* ── TOAST ── */
+/* ── MISC ── */
 #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--surface3); border: 1px solid var(--border2); border-radius: 10px; padding: 10px 20px; font-size: 0.875rem; pointer-events: none; opacity: 0; transition: opacity 0.25s; z-index: 999; white-space: nowrap; }
 #toast.show { opacity: 1; }
-
 .tier-complete { text-align: center; padding: 48px 24px; animation: fadeIn 0.4s ease; }
 .tier-complete .big { font-size: 3.5rem; margin-bottom: 16px; }
 .tier-complete h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
 .tier-complete p { color: var(--text2); margin-bottom: 24px; }
-@keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+@keyframes fadeIn  { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
 @keyframes slideIn { from { opacity:0; transform: scale(0.96); } to { opacity:1; transform: scale(1); } }
 .animate-in { animation: slideIn 0.2s ease; }
 .divider { height: 1px; background: var(--border); margin: 24px 0; }
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; }
+.loading-row { display: flex; align-items: center; gap: 10px; color: var(--text2); font-size: 0.88rem; padding: 16px 0; }
 
-/* 모바일 대응: 작은 화면에서는 다시 스크롤 허용 및 고정 비율 적용 */
+/* ── MOBILE ── */
 @media (max-width: 768px) {
   main.sort-fullscreen { max-width: 100%; height: auto; min-height: calc(100vh - 56px); overflow: visible; padding: 16px 12px; }
   .cmp-img-wrap, .fiveStep-card-img { padding-bottom: 80% !important; flex: none; }
   .fiveStep-grid { grid-template-columns: 1fr; }
   .five-btn { width: 100%; }
   .five-btns { width: 100%; padding: 0; }
+  .sort-embeds { grid-template-columns: 1fr; gap: 8px; }
+  .sort-embeds iframe { height: 152px !important; }
+  main { padding: 20px 16px 80px; }
 }
 </style>
 </head>
 <body>
 
+<!-- ══ HEADER ══ -->
 <div id="header">
   <div class="logo"><div class="logo-dot"></div>ELO SORTER</div>
   <nav class="nav">
@@ -548,30 +555,123 @@ main.sort-fullscreen {
       <span class="step-num">3</span> 랭킹
     </button>
   </nav>
+  <button id="syncBtn" onclick="runSync()" title="Spotify에서 신규 곡 감지">
+    <span class="sync-icon">↻</span> 동기화
+    <span class="sync-badge" id="syncBadge" style="display:none"></span>
+  </button>
+  <button class="nav-btn" onclick="openSettings()" title="설정" style="padding:6px 10px">⚙</button>
 </div>
 
+<!-- ══ MAIN ══ -->
 <main>
+
+<!-- IMPORT PHASE -->
 <div class="phase active" id="phase-import">
-  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-    <div class="icon">🎵</div>
-    <h2>플레이리스트 JSON 불러오기</h2>
-    <p>클릭하거나 파일을 드래그하세요<br>
-      <code>[{id, name, artists[], image, album, uri}]</code> 형식 또는 저장된 세션 파일
-    </p>
-  </div>
-  <input type="file" id="fileInput" accept=".json" style="display:none" onchange="onFileInput(event)">
-  <div class="session-card" id="savedPanel" style="display:none">
-    <div>
-      <h3>💾 저장된 세션</h3>
-      <p id="savedInfo"></p>
+
+  <!-- Not logged in -->
+  <div id="connectView">
+    <div class="connect-hero">
+      <div class="big-icon">🎵</div>
+      <h2>Spotify 계정 연결</h2>
+      <p>좋아요 곡 또는 플레이리스트를 불러와 ELO 정렬을 시작하세요.<br>데이터는 Supabase에 자동 저장됩니다.</p>
+      <button class="btn btn-spotify" onclick="spotifyLogin()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 01-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 01-.277-1.215c3.809-.87 7.076-.495 9.712 1.115a.623.623 0 01.207.857zm1.223-2.722a.78.78 0 01-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 01-.973-.519.781.781 0 01.52-.973c3.632-1.102 8.147-.568 11.233 1.329a.78.78 0 01.257 1.072zm.105-2.835C14.69 9.145 9.375 8.955 6.204 9.88a.937.937 0 11-.543-1.794c3.618-1.096 9.635-.884 13.432 1.312a.937.937 0 01-.179 1.469z"/></svg>
+        Spotify로 로그인
+      </button>
+      <p style="margin-top:16px;font-size:0.78rem;color:var(--text3)">설정(⚙)에서 Spotify Client ID와 Supabase 정보를 먼저 입력하세요</p>
     </div>
-    <div class="btn-row">
-      <button class="btn btn-green" onclick="resumeSession()">이어서 하기</button>
-      <button class="btn btn-outline btn-sm" onclick="clearSession()">초기화</button>
+  </div>
+
+  <!-- Logged in -->
+  <div id="sourceView" style="display:none">
+
+    <!-- User info -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-row">
+        <div class="spotify-user-row">
+          <img class="spotify-avatar" id="spotifyAvatar" src="" alt="">
+          <div>
+            <div class="spotify-user-name" id="spotifyUserName">—</div>
+            <div class="spotify-user-sub" id="spotifyUserSub">Spotify 연결됨</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="cloud-status" id="cloudStatus">
+            <span class="cloud-dot" id="cloudDot"></span>
+            <span id="cloudStatusText">Supabase 미설정</span>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="spotifyLogout()">로그아웃</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- New tracks banner -->
+    <div class="new-tracks-banner" id="newTracksBanner">
+      <div class="new-tracks-count" id="newTracksCount">0</div>
+      <div class="new-tracks-text">
+        <strong>신규 곡이 감지되었습니다</strong><br>
+        <span id="newTracksNames" style="font-size:0.82rem;color:var(--text2)"></span>
+      </div>
+      <button class="btn btn-green btn-sm" onclick="absorbNewTracks()">티어 분류 시작 →</button>
+    </div>
+
+    <!-- Source picker -->
+    <div class="card">
+      <div class="card-title">음악 소스 선택</div>
+      <div class="source-tabs">
+        <button class="source-tab active" id="tabLiked" onclick="switchSource('liked')">💚 좋아요 곡</button>
+        <button class="source-tab" id="tabPlaylist" onclick="switchSource('playlist')">📋 플레이리스트</button>
+      </div>
+
+      <div id="likedView">
+        <div class="card-row" style="gap:16px">
+          <div>
+            <div style="font-size:0.95rem;font-weight:600">좋아요 표시한 곡</div>
+            <div style="font-size:0.82rem;color:var(--text2);margin-top:4px" id="likedCountText">마지막 동기화: 없음</div>
+          </div>
+          <button class="btn btn-green" onclick="loadLikedSongs()" id="loadLikedBtn">불러오기</button>
+        </div>
+      </div>
+
+      <div id="playlistView" style="display:none">
+        <div id="playlistLoading" class="loading-row" style="display:none">
+          <span class="spinner"></span> 플레이리스트 목록 로딩 중…
+        </div>
+        <div id="playlistEmpty" style="display:none;color:var(--text2);font-size:0.88rem;padding:12px 0">플레이리스트가 없습니다</div>
+        <div class="playlist-list" id="playlistList"></div>
+        <div style="margin-top:12px;display:flex;justify-content:flex-end">
+          <button class="btn btn-green btn-sm" onclick="loadSelectedPlaylist()" id="loadPlaylistBtn" disabled>선택한 플레이리스트 불러오기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Supabase session -->
+    <div class="card" id="cloudCard">
+      <div class="card-title">클라우드 저장</div>
+      <div id="cloudLoadRow" class="card-row" style="display:none">
+        <div>
+          <div style="font-size:0.9rem;font-weight:600">저장된 세션</div>
+          <div style="font-size:0.8rem;color:var(--text2);margin-top:3px" id="cloudSavedAt">—</div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-green btn-sm" onclick="loadFromSupabase()">클라우드에서 불러오기</button>
+          <button class="btn btn-outline btn-sm" onclick="confirmClearCloud()">초기화</button>
+        </div>
+      </div>
+      <div id="cloudNoData" style="font-size:0.88rem;color:var(--text2)">저장된 세션이 없습니다</div>
+    </div>
+
+    <!-- Loading state -->
+    <div id="loadingTracks" style="display:none">
+      <div class="loading-row" style="justify-content:center;padding:32px">
+        <span class="spinner"></span>
+        <span id="loadingText">Spotify에서 곡을 불러오는 중…</span>
+      </div>
     </div>
   </div>
 </div>
 
+<!-- TIER PHASE -->
 <div class="phase" id="phase-tier">
   <div class="progress-wrap"><div class="progress-fill" id="tierProgress"></div></div>
   <div class="progress-label">
@@ -590,11 +690,12 @@ main.sort-fullscreen {
             </div>
             <div class="tier-overlay-row">
               <div class="tier-overlay-text">
+                <div id="tierNewBadge" class="new-badge" style="display:none">✦ 신규 추가</div>
                 <div class="tier-overlay-name" id="tierName"></div>
                 <div class="tier-overlay-artist" id="tierArtist"></div>
                 <div class="tier-overlay-album" id="tierAlbum"></div>
               </div>
-              <button class="tier-play-btn" id="tierPlayBtn" onclick="toggleTierPlay()" title="재생/일시정지">
+              <button class="tier-play-btn" id="tierPlayBtn" onclick="toggleTierPlay()">
                 <svg id="tierPlayIcon" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
                   <path d="M8 5v14l11-7z"/>
                 </svg>
@@ -634,7 +735,7 @@ main.sort-fullscreen {
         <div class="tier-actions">
           <button class="btn btn-outline btn-sm" id="undoBtn" onclick="undoTier()" disabled>↩ 되돌리기 (Z)</button>
           <button class="btn btn-ghost btn-sm" onclick="skipRemainingToTier2()" id="skipBtn" style="display:none">나머지 Tier 3으로 →</button>
-          <button class="btn btn-outline btn-sm" onclick="exportJSON()" style="margin-left:auto">💾 저장</button>
+          <button class="btn btn-outline btn-sm" onclick="saveToSupabase()" style="margin-left:auto">☁️ 저장</button>
         </div>
         <div class="tier-stats" id="tierStats">
           <h4>분류 현황</h4>
@@ -667,6 +768,7 @@ main.sort-fullscreen {
   </div>
 </div>
 
+<!-- SORT PHASE -->
 <div class="phase" id="phase-sort">
   <div class="sort-header">
     <div>
@@ -684,7 +786,7 @@ main.sort-fullscreen {
     <span class="rsi-label">수렴 (RSI)</span>
     <div class="rsi-track"><div class="rsi-fill" id="rsiFill" style="width:0%;background:var(--danger)"></div></div>
     <span class="rsi-val" id="rsiValDisplay">—</span>
-    <span class="rsi-hint">목표: <10점</span>
+    <span class="rsi-hint">목표: &lt;10점</span>
   </div>
 
   <div id="binaryMode">
@@ -694,10 +796,7 @@ main.sort-fullscreen {
         <div class="cmp-body">
           <div class="cmp-name" id="bNameA"></div>
           <div class="cmp-artist" id="bArtistA"></div>
-          <div class="cmp-elo">
-            <span>ELO</span>
-            <span class="cmp-elo-num" id="bEloA"></span>
-          </div>
+          <div class="cmp-elo"><span>ELO</span><span class="cmp-elo-num" id="bEloA"></span></div>
         </div>
       </div>
       <div class="cmp-card" id="cardB" onclick="choose(0.0)">
@@ -705,10 +804,7 @@ main.sort-fullscreen {
         <div class="cmp-body">
           <div class="cmp-name" id="bNameB"></div>
           <div class="cmp-artist" id="bArtistB"></div>
-          <div class="cmp-elo">
-            <span>ELO</span>
-            <span class="cmp-elo-num" id="bEloB"></span>
-          </div>
+          <div class="cmp-elo"><span>ELO</span><span class="cmp-elo-num" id="bEloB"></span></div>
         </div>
       </div>
     </div>
@@ -726,7 +822,7 @@ main.sort-fullscreen {
         </div>
       </div>
       <div class="five-btns">
-        <div class="five-vs">A   VS   B</div>
+        <div class="five-vs">A &nbsp; VS &nbsp; B</div>
         <button class="five-btn btn-a-strong" onclick="choose(1.0)"><span>A가 훨씬 좋다</span><span class="five-btn-key">1</span></button>
         <button class="five-btn btn-a-mild"   onclick="choose(0.7)"><span>A가 조금 좋다</span><span class="five-btn-key">2</span></button>
         <button class="five-btn btn-tie"      onclick="choose(0.5)"><span>비슷하다</span><span class="five-btn-key">3</span></button>
@@ -745,21 +841,26 @@ main.sort-fullscreen {
   </div>
 
   <div class="sort-embeds" id="sortEmbeds">
-    <div class="embed-wrap"><iframe id="sortEmbedA" src="" width="100%" height="80" style="min-height:80px" frameborder="0"
-      allow="autoplay; clipboard-write; encrypted-media" loading="lazy"></iframe></div>
-    <div class="embed-wrap"><iframe id="sortEmbedB" src="" width="100%" height="80" style="min-height:80px" frameborder="0"
-      allow="autoplay; clipboard-write; encrypted-media" loading="lazy"></iframe></div>
+    <div class="embed-wrap">
+      <iframe id="sortEmbedA" src="" width="100%" height="80" frameborder="0"
+        allow="autoplay; clipboard-write; encrypted-media" loading="lazy"></iframe>
+    </div>
+    <div class="embed-wrap">
+      <iframe id="sortEmbedB" src="" width="100%" height="80" frameborder="0"
+        allow="autoplay; clipboard-write; encrypted-media" loading="lazy"></iframe>
+    </div>
   </div>
 
   <div class="sort-footer">
     <button class="btn btn-outline btn-sm" onclick="goPhase('rank')">🏆 현재 랭킹 보기</button>
     <div class="btn-row">
-      <button class="btn btn-outline btn-sm" onclick="exportJSON()">💾 JSON 내보내기</button>
+      <button class="btn btn-outline btn-sm" onclick="saveToSupabase()">☁️ 저장</button>
       <button class="btn btn-green btn-sm" onclick="goPhase('rank')">완료 →</button>
     </div>
   </div>
 </div>
 
+<!-- RANK PHASE -->
 <div class="phase" id="phase-rank">
   <div class="rank-header">
     <div>
@@ -768,7 +869,7 @@ main.sort-fullscreen {
     </div>
     <div class="btn-row">
       <button class="btn btn-outline btn-sm" onclick="goPhase('sort')">⚔️ 계속 정렬</button>
-      <button class="btn btn-green btn-sm" onclick="exportJSON()">💾 JSON 내보내기</button>
+      <button class="btn btn-green btn-sm" onclick="saveToSupabase()">☁️ 저장</button>
     </div>
   </div>
   <div id="rankList"></div>
@@ -777,37 +878,562 @@ main.sort-fullscreen {
 </main>
 <div id="toast"></div>
 
+<!-- ══ SETTINGS MODAL ══ -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>⚙️ 설정</h2>
+    <p>Spotify Developer Dashboard와 Supabase에서 발급받은 정보를 입력하세요.<br>한 번 입력하면 브라우저에 저장됩니다.</p>
+
+    <div class="field">
+      <label>SPOTIFY_CLIENT_ID</label>
+      <input type="text" id="cfgClientId" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+      <div class="hint">
+        <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:var(--accent)">developer.spotify.com</a>에서 앱 생성 후 Client ID 복사<br>
+        Redirect URI에 <strong id="hintRedirectUri" style="color:var(--text2)"></strong> 추가 필요
+      </div>
+    </div>
+    <div class="field">
+      <label>SUPABASE_URL</label>
+      <input type="text" id="cfgSupabaseUrl" placeholder="https://xxxx.supabase.co">
+    </div>
+    <div class="field">
+      <label>SUPABASE_ANON_KEY</label>
+      <input type="text" id="cfgAnonKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+      <div class="hint">Supabase → Settings → API → anon public key</div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-sm" onclick="closeSettings()">취소</button>
+      <button class="btn btn-green btn-sm" onclick="saveSettings()">저장</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════
-//  STATE
+//  CONFIG (localStorage에서 로드)
 // ══════════════════════════════════════════════
-let tracks = [];
-let compCount = 0;
-let rsiDeltas = [];
-let tierHistory = [];
-let curPair = null;
-let lastPairKey = '';
+let CFG = {
+  clientId: '',
+  supabaseUrl: '',
+  anonKey: '',
+  redirectUri: window.location.origin + window.location.pathname,
+};
+
+function loadCfg() {
+  const saved = localStorage.getItem('eloConfig');
+  if (saved) { try { Object.assign(CFG, JSON.parse(saved)); } catch {} }
+  CFG.redirectUri = window.location.origin + window.location.pathname;
+}
+
+function openSettings() {
+  loadCfg();
+  document.getElementById('cfgClientId').value   = CFG.clientId   || '';
+  document.getElementById('cfgSupabaseUrl').value = CFG.supabaseUrl || '';
+  document.getElementById('cfgAnonKey').value     = CFG.anonKey    || '';
+  document.getElementById('hintRedirectUri').textContent = CFG.redirectUri;
+  document.getElementById('settingsModal').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+function saveSettings() {
+  CFG.clientId    = document.getElementById('cfgClientId').value.trim();
+  CFG.supabaseUrl = document.getElementById('cfgSupabaseUrl').value.trim().replace(/\/$/, '');
+  CFG.anonKey     = document.getElementById('cfgAnonKey').value.trim();
+  localStorage.setItem('eloConfig', JSON.stringify(CFG));
+  closeSettings();
+  toast('✅ 설정 저장됨');
+  updateCloudStatus();
+}
 
 // ══════════════════════════════════════════════
-//  SPOTIFY IFRAME API
+//  SPOTIFY OAUTH PKCE
+// ══════════════════════════════════════════════
+const SCOPES = 'user-library-read playlist-read-private user-read-private user-read-email';
+
+function base64url(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+async function generatePKCE() {
+  const verifier = base64url(crypto.getRandomValues(new Uint8Array(64)));
+  const hashed   = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  const challenge = base64url(hashed);
+  return { verifier, challenge };
+}
+
+async function spotifyLogin() {
+  loadCfg();
+  if (!CFG.clientId) { openSettings(); toast('⚠️ 먼저 Spotify Client ID를 설정해주세요'); return; }
+  const { verifier, challenge } = await generatePKCE();
+  sessionStorage.setItem('pkce_verifier', verifier);
+
+  const params = new URLSearchParams({
+    response_type:         'code',
+    client_id:             CFG.clientId,
+    scope:                 SCOPES,
+    redirect_uri:          CFG.redirectUri,
+    code_challenge_method: 'S256',
+    code_challenge:        challenge,
+  });
+  window.location.href = 'https://accounts.spotify.com/authorize?' + params;
+}
+
+async function handleOAuthCallback(code) {
+  loadCfg();
+  const verifier = sessionStorage.getItem('pkce_verifier');
+  if (!verifier) { toast('❌ PKCE verifier 없음. 다시 로그인해주세요'); return false; }
+
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type:    'authorization_code',
+      code,
+      redirect_uri:  CFG.redirectUri,
+      client_id:     CFG.clientId,
+      code_verifier: verifier,
+    }),
+  });
+
+  if (!res.ok) { toast('❌ 토큰 교환 실패. 다시 로그인해주세요'); return false; }
+  const data = await res.json();
+  storeTokens(data);
+  sessionStorage.removeItem('pkce_verifier');
+
+  // URL에서 code 파라미터 제거
+  window.history.replaceState({}, '', window.location.pathname);
+  return true;
+}
+
+function storeTokens(data) {
+  localStorage.setItem('spotify_access_token',  data.access_token);
+  localStorage.setItem('spotify_refresh_token', data.refresh_token);
+  localStorage.setItem('spotify_token_expires', Date.now() + data.expires_in * 1000);
+}
+
+async function getAccessToken() {
+  const expires = parseInt(localStorage.getItem('spotify_token_expires') || '0');
+  if (Date.now() < expires - 60000) {
+    return localStorage.getItem('spotify_access_token');
+  }
+  return await refreshToken();
+}
+
+async function refreshToken() {
+  loadCfg();
+  const refresh = localStorage.getItem('spotify_refresh_token');
+  if (!refresh) return null;
+
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type:    'refresh_token',
+      refresh_token: refresh,
+      client_id:     CFG.clientId,
+    }),
+  });
+
+  if (!res.ok) {
+    spotifyLogout();
+    return null;
+  }
+  const data = await res.json();
+  storeTokens({ ...data, refresh_token: data.refresh_token || refresh });
+  return data.access_token;
+}
+
+function spotifyLogout() {
+  ['spotify_access_token','spotify_refresh_token','spotify_token_expires'].forEach(k => localStorage.removeItem(k));
+  document.getElementById('connectView').style.display = 'block';
+  document.getElementById('sourceView').style.display  = 'none';
+  document.getElementById('syncBtn').style.display = 'none';
+  toast('Spotify 로그아웃됨');
+}
+
+function isLoggedIn() {
+  return !!localStorage.getItem('spotify_access_token');
+}
+
+async function spotifyAPI(path) {
+  const token = await getAccessToken();
+  if (!token) throw new Error('로그인 필요');
+  const res = await fetch('https://api.spotify.com/v1' + path, {
+    headers: { Authorization: 'Bearer ' + token },
+  });
+  if (!res.ok) throw new Error('Spotify API 오류: ' + res.status);
+  return res.json();
+}
+
+// ══════════════════════════════════════════════
+//  SPOTIFY USER & PLAYLISTS
+// ══════════════════════════════════════════════
+async function loadUserProfile() {
+  const me = await spotifyAPI('/me');
+  document.getElementById('spotifyUserName').textContent = me.display_name || me.id;
+  document.getElementById('spotifyUserSub').textContent  = `${me.email || ''} · Spotify 연결됨`;
+  if (me.images?.[0]?.url) document.getElementById('spotifyAvatar').src = me.images[0].url;
+}
+
+async function loadPlaylists() {
+  document.getElementById('playlistLoading').style.display = 'flex';
+  document.getElementById('playlistList').innerHTML = '';
+
+  let playlists = [];
+  let next = '/me/playlists?limit=50';
+  while (next) {
+    const data = await spotifyAPI(next.replace('https://api.spotify.com/v1',''));
+    playlists.push(...data.items.filter(Boolean));
+    next = data.next ? data.next.replace('https://api.spotify.com/v1','') : null;
+  }
+
+  document.getElementById('playlistLoading').style.display = 'none';
+  if (!playlists.length) { document.getElementById('playlistEmpty').style.display = 'block'; return; }
+
+  const list = document.getElementById('playlistList');
+  playlists.forEach(pl => {
+    const btn = document.createElement('button');
+    btn.className = 'playlist-item';
+    btn.dataset.id = pl.id;
+    btn.innerHTML = `
+      <img class="playlist-img" src="${pl.images?.[0]?.url || ''}" alt="" onerror="this.style.display='none'">
+      <div>
+        <div class="playlist-name">${pl.name}</div>
+        <div class="playlist-sub">${pl.tracks.total}곡</div>
+      </div>`;
+    btn.onclick = () => {
+      document.querySelectorAll('.playlist-item').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedPlaylistId   = pl.id;
+      selectedPlaylistName = pl.name;
+      document.getElementById('loadPlaylistBtn').disabled = false;
+    };
+    list.appendChild(btn);
+  });
+}
+
+let selectedPlaylistId   = null;
+let selectedPlaylistName = '';
+let currentSource = 'liked'; // 'liked' | 'playlist:{id}'
+
+function switchSource(mode) {
+  currentSource = mode;
+  document.getElementById('tabLiked').classList.toggle('active', mode === 'liked');
+  document.getElementById('tabPlaylist').classList.toggle('active', mode === 'playlist');
+  document.getElementById('likedView').style.display    = mode === 'liked'     ? 'block' : 'none';
+  document.getElementById('playlistView').style.display = mode === 'playlist'  ? 'block' : 'none';
+
+  if (mode === 'playlist' && !document.getElementById('playlistList').childElementCount) {
+    loadPlaylists();
+  }
+}
+
+// ══════════════════════════════════════════════
+//  SPOTIFY TRACK FETCHING
+// ══════════════════════════════════════════════
+function trackFromItem(item) {
+  const t = item.track || item;
+  if (!t?.id) return null;
+  return {
+    id:          t.id,
+    name:        t.name,
+    artists:     t.artists.map(a => a.name),
+    image:       t.album.images?.[0]?.url || '',
+    album:       t.album.name || '',
+    uri:         t.uri,
+    addedAt:     item.added_at || null,
+    tier:        null,
+    rating:      1500,
+    comparisons: 0,
+    isNew:       false,
+  };
+}
+
+async function fetchAllTracks(endpoint, progressCb) {
+  const results = [];
+  let next = endpoint;
+  while (next) {
+    const data = await spotifyAPI(next.replace('https://api.spotify.com/v1',''));
+    const items = data.items.map(trackFromItem).filter(Boolean);
+    results.push(...items);
+    if (progressCb) progressCb(results.length, data.total);
+    next = data.next ? data.next.replace('https://api.spotify.com/v1','') : null;
+  }
+  return results;
+}
+
+async function loadLikedSongs() {
+  document.getElementById('loadingTracks').style.display = 'block';
+  document.getElementById('loadingText').textContent = 'Spotify에서 좋아요 곡을 불러오는 중…';
+  try {
+    const fetched = await fetchAllTracks('/me/tracks?limit=50', (n, total) => {
+      document.getElementById('loadingText').textContent = `좋아요 곡 불러오는 중… ${n} / ${total}`;
+    });
+    document.getElementById('loadingTracks').style.display = 'none';
+    document.getElementById('likedCountText').textContent = `${fetched.length}곡 · 동기화 완료`;
+    currentSource = 'liked';
+    initFromFetched(fetched);
+  } catch(e) {
+    document.getElementById('loadingTracks').style.display = 'none';
+    toast('❌ 불러오기 실패: ' + e.message);
+  }
+}
+
+async function loadSelectedPlaylist() {
+  if (!selectedPlaylistId) return;
+  document.getElementById('loadingTracks').style.display = 'block';
+  document.getElementById('loadingText').textContent = `"${selectedPlaylistName}" 불러오는 중…`;
+  try {
+    const fetched = await fetchAllTracks(`/playlists/${selectedPlaylistId}/tracks?limit=50`, (n, total) => {
+      document.getElementById('loadingText').textContent = `"${selectedPlaylistName}" 불러오는 중… ${n} / ${total}`;
+    });
+    document.getElementById('loadingTracks').style.display = 'none';
+    currentSource = 'playlist:' + selectedPlaylistId;
+    initFromFetched(fetched);
+  } catch(e) {
+    document.getElementById('loadingTracks').style.display = 'none';
+    toast('❌ 불러오기 실패: ' + e.message);
+  }
+}
+
+// ══════════════════════════════════════════════
+//  SYNC — 신규 곡 감지
+// ══════════════════════════════════════════════
+let pendingNewTracks = []; // 티어 분류 대기 중인 신규 곡
+
+async function runSync() {
+  if (!isLoggedIn()) { toast('⚠️ Spotify 로그인 필요'); return; }
+  if (!tracks.length) { toast('⚠️ 먼저 음악 소스를 불러오세요'); return; }
+
+  const syncBtn = document.getElementById('syncBtn');
+  syncBtn.classList.add('syncing');
+  syncBtn.querySelector('.sync-icon').textContent = '↻';
+
+  try {
+    let endpoint;
+    if (currentSource === 'liked') {
+      endpoint = '/me/tracks?limit=50';
+    } else if (currentSource.startsWith('playlist:')) {
+      const plId = currentSource.split(':')[1];
+      endpoint = `/playlists/${plId}/tracks?limit=50`;
+    } else {
+      toast('⚠️ 동기화할 소스가 없습니다');
+      syncBtn.classList.remove('syncing');
+      return;
+    }
+
+    // 마지막 동기화 이후 추가된 곡만 효율적으로 가져오기
+    // Spotify는 added_at 내림차순 정렬이므로 lastSyncedAt 이전 곡 나오면 중단
+    const knownIds = new Set(tracks.map(t => t.id));
+    const newFetched = [];
+    let fetchNext = endpoint;
+    let stopEarly = false;
+
+    while (fetchNext && !stopEarly) {
+      const data = await spotifyAPI(fetchNext.replace('https://api.spotify.com/v1',''));
+      for (const item of data.items) {
+        const t = trackFromItem(item);
+        if (!t) continue;
+        if (knownIds.has(t.id)) {
+          // 이미 알고 있는 곡 → 이후는 모두 아는 곡이므로 중단 가능
+          // (단, 플레이리스트는 정렬 순서가 다를 수 있으므로 한 페이지 더 확인)
+          stopEarly = currentSource === 'liked';
+          continue;
+        }
+        newFetched.push(t);
+      }
+      fetchNext = data.next ? data.next.replace('https://api.spotify.com/v1','') : null;
+      if (stopEarly) fetchNext = null;
+    }
+
+    syncBtn.classList.remove('syncing');
+
+    if (!newFetched.length) {
+      toast('✅ 신규 곡 없음 — 이미 최신 상태입니다');
+      document.getElementById('syncBadge').style.display = 'none';
+      return;
+    }
+
+    // 신규 곡 플래그 설정
+    newFetched.forEach(t => { t.isNew = true; });
+    pendingNewTracks = newFetched;
+
+    // 배너 표시
+    const banner = document.getElementById('newTracksBanner');
+    document.getElementById('newTracksCount').textContent = newFetched.length;
+    document.getElementById('newTracksNames').textContent =
+      newFetched.slice(0, 3).map(t => `${t.name} — ${t.artists[0]}`).join(' / ') +
+      (newFetched.length > 3 ? ` 외 ${newFetched.length - 3}곡` : '');
+    banner.classList.add('show');
+
+    // 헤더 뱃지
+    const badge = document.getElementById('syncBadge');
+    badge.textContent = newFetched.length;
+    badge.style.display = 'inline';
+
+    toast(`✦ ${newFetched.length}곡 신규 감지됨`);
+
+    // 불러오기 탭으로 이동해서 배너 보여주기
+    if (document.querySelector('.phase.active')?.id !== 'phase-import') goPhase('import');
+
+  } catch(e) {
+    syncBtn.classList.remove('syncing');
+    toast('❌ 동기화 실패: ' + e.message);
+  }
+}
+
+function absorbNewTracks() {
+  if (!pendingNewTracks.length) return;
+
+  // 기존 tracks에 신규 곡 추가
+  tracks.push(...pendingNewTracks);
+  pendingNewTracks = [];
+
+  // 배너 닫기, 뱃지 초기화
+  document.getElementById('newTracksBanner').classList.remove('show');
+  document.getElementById('syncBadge').style.display = 'none';
+
+  saveState();
+  toast(`✦ ${tracks.filter(t=>t.isNew).length}곡이 티어 분류 큐에 추가됨`);
+  goPhase('tier');
+}
+
+// ══════════════════════════════════════════════
+//  SUPABASE
+// ══════════════════════════════════════════════
+const SB_TABLE = 'elo_state';
+const SB_ROW   = 'main';
+
+async function sbFetch(path, method = 'GET', body = null) {
+  loadCfg();
+  if (!CFG.supabaseUrl || !CFG.anonKey) throw new Error('Supabase 미설정');
+  const res = await fetch(`${CFG.supabaseUrl}/rest/v1/${path}`, {
+    method,
+    headers: {
+      'apikey':        CFG.anonKey,
+      'Authorization': 'Bearer ' + CFG.anonKey,
+      'Content-Type':  'application/json',
+      'Prefer':        method === 'POST' ? 'resolution=merge-duplicates,return=minimal' : '',
+    },
+    body: body ? JSON.stringify(body) : null,
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt);
+  }
+  if (method === 'DELETE' || res.status === 204) return null;
+  const ct = res.headers.get('content-type') || '';
+  return ct.includes('application/json') ? res.json() : null;
+}
+
+async function saveToSupabase() {
+  try {
+    const payload = {
+      id:   SB_ROW,
+      data: {
+        tracks, compCount, rsiDeltas,
+        currentSource,
+        savedAt: new Date().toISOString(),
+      },
+      updated_at: new Date().toISOString(),
+    };
+    await sbFetch(SB_TABLE, 'POST', payload);
+    updateCloudStatus('ok', '방금 저장됨');
+    toast('☁️ Supabase에 저장됨');
+  } catch(e) {
+    updateCloudStatus('err', '저장 실패');
+    toast('❌ 저장 실패: ' + e.message);
+  }
+}
+
+async function loadFromSupabase() {
+  try {
+    const rows = await sbFetch(`${SB_TABLE}?id=eq.${SB_ROW}&select=data`);
+    if (!rows?.length || !rows[0].data) { toast('☁️ 저장된 데이터 없음'); return; }
+    const d = rows[0].data;
+    tracks       = d.tracks       || [];
+    compCount    = d.compCount    || 0;
+    rsiDeltas    = d.rsiDeltas    || [];
+    currentSource = d.currentSource || 'liked';
+    tierHistory  = [];
+    enableNav();
+    saveState();
+    updateCloudStatus('ok', new Date(d.savedAt).toLocaleString('ko-KR'));
+    toast(`☁️ ${tracks.length}곡 불러오기 완료`);
+    const untiered = tracks.filter(t => t.tier === null);
+    goPhase(untiered.length ? 'tier' : 'sort');
+  } catch(e) {
+    updateCloudStatus('err', '불러오기 실패');
+    toast('❌ 불러오기 실패: ' + e.message);
+  }
+}
+
+async function checkCloudSession() {
+  loadCfg();
+  if (!CFG.supabaseUrl || !CFG.anonKey) {
+    updateCloudStatus('', 'Supabase 미설정');
+    document.getElementById('cloudNoData').style.display = 'block';
+    document.getElementById('cloudLoadRow').style.display = 'none';
+    return;
+  }
+  try {
+    const rows = await sbFetch(`${SB_TABLE}?id=eq.${SB_ROW}&select=data,updated_at`);
+    if (rows?.length && rows[0].data) {
+      const d = rows[0].data;
+      const dt = new Date(rows[0].updated_at || d.savedAt).toLocaleString('ko-KR');
+      document.getElementById('cloudSavedAt').textContent = `${d.tracks?.length || 0}곡 · ${dt}`;
+      document.getElementById('cloudLoadRow').style.display = 'flex';
+      document.getElementById('cloudNoData').style.display  = 'none';
+      updateCloudStatus('ok', dt);
+    } else {
+      document.getElementById('cloudNoData').style.display  = 'block';
+      document.getElementById('cloudLoadRow').style.display = 'none';
+      updateCloudStatus('ok', '데이터 없음');
+    }
+  } catch {
+    updateCloudStatus('err', '연결 실패');
+  }
+}
+
+function updateCloudStatus(state = '', text = '') {
+  const dot  = document.getElementById('cloudDot');
+  const span = document.getElementById('cloudStatusText');
+  dot.className  = 'cloud-dot' + (state ? ' ' + state : '');
+  span.textContent = text || (state === 'ok' ? '연결됨' : state === 'err' ? '오류' : '미설정');
+}
+
+async function confirmClearCloud() {
+  if (!confirm('Supabase 저장 데이터를 삭제하시겠습니까?')) return;
+  try {
+    await sbFetch(`${SB_TABLE}?id=eq.${SB_ROW}`, 'DELETE');
+    toast('🗑️ 클라우드 데이터 삭제됨');
+    checkCloudSession();
+  } catch(e) {
+    toast('❌ 삭제 실패: ' + e.message);
+  }
+}
+
+// ══════════════════════════════════════════════
+//  SPOTIFY IFRAME API (Tier 재생)
 // ══════════════════════════════════════════════
 let spotifyController = null;
 let tierIsPlaying = false;
-let pendingUri = null;
+let pendingUri    = null;
 
 window.onSpotifyIframeApiReady = (IFrameAPI) => {
   const el = document.getElementById('spotifyApiMount');
   if (!el) return;
-  IFrameAPI.createController(el, {
-    width: '100%',
-    height: '80',
-    uri: 'spotify:track:4oHQ8n9OKQ3599e8noCrDX',
-  }, (ctrl) => {
+  IFrameAPI.createController(el, { width:'100%', height:'80', uri:'spotify:track:4oHQ8n9OKQ3599e8noCrDX' }, ctrl => {
     spotifyController = ctrl;
     ctrl.addListener('playback_update', ev => {
-      const wasPlaying = tierIsPlaying;
+      const was = tierIsPlaying;
       tierIsPlaying = !ev.data.isPaused;
-      if (wasPlaying !== tierIsPlaying) updateTierPlayUI();
+      if (was !== tierIsPlaying) updateTierPlayUI();
     });
     if (pendingUri) { ctrl.loadUri(pendingUri); ctrl.play(); pendingUri = null; }
   });
@@ -821,8 +1447,7 @@ function tierAutoPlay(uri) {
 
 function toggleTierPlay() {
   if (!spotifyController) return;
-  if (tierIsPlaying) spotifyController.pause();
-  else spotifyController.play();
+  tierIsPlaying ? spotifyController.pause() : spotifyController.play();
 }
 
 function updateTierPlayUI() {
@@ -842,40 +1467,28 @@ function updateTierPlayUI() {
 //  PROBIT
 // ══════════════════════════════════════════════
 function probit(p) {
-  const a = [-3.969683028665376e+01,2.209460984245205e+02,-2.759285104469687e+02,1.383577518672690e+02,-3.066479806614716e+01,2.506628277459239e+00];
-  const b = [-5.447609879822406e+01,1.615858368580409e+02,-1.556989798598866e+02,6.680131188771972e+01,-1.328068155288572e+01];
-  const c = [-7.784894002430293e-03,-3.223964580411365e-01,-2.400758277161838e+00,-2.549732539343734e+00,4.374664141464968e+00,2.938163982698783e+00];
-  const d = [7.784695709041462e-03,3.224671290700398e-01,2.445134137142996e+00,3.754408661907416e+00];
-  const pLow = 0.02425, pHigh = 1 - pLow;
-  let q, r;
-  if (p < pLow) {
-    q = Math.sqrt(-2*Math.log(p));
-    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
-  } else if (p <= pHigh) {
-    q = p - 0.5; r = q*q;
-    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
-  } else {
-    q = Math.sqrt(-2*Math.log(1-p));
-    return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
-  }
+  const a=[-3.969683028665376e+01,2.209460984245205e+02,-2.759285104469687e+02,1.383577518672690e+02,-3.066479806614716e+01,2.506628277459239e+00];
+  const b=[-5.447609879822406e+01,1.615858368580409e+02,-1.556989798598866e+02,6.680131188771972e+01,-1.328068155288572e+01];
+  const c=[-7.784894002430293e-03,-3.223964580411365e-01,-2.400758277161838e+00,-2.549732539343734e+00,4.374664141464968e+00,2.938163982698783e+00];
+  const d=[7.784695709041462e-03,3.224671290700398e-01,2.445134137142996e+00,3.754408661907416e+00];
+  const pLow=0.02425,pHigh=1-pLow; let q,r;
+  if(p<pLow){q=Math.sqrt(-2*Math.log(p));return(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+  else if(p<=pHigh){q=p-0.5;r=q*q;return(((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);}
+  else{q=Math.sqrt(-2*Math.log(1-p));return-(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
 }
 
 // ══════════════════════════════════════════════
 //  ELO ENGINE
 // ══════════════════════════════════════════════
-const TIER_PMID = {1:0.95, 2:0.70, 3:0.25};
-const SIGMA = 200;
+const TIER_PMID  = {1:0.95, 2:0.70, 3:0.25};
+const SIGMA      = 200;
 const BOUNDARIES = [1700, 1500];
 
-function initRating(tier) {
-  return Math.round(1500 + SIGMA * probit(TIER_PMID[tier]));
-}
+function initRating(tier) { return Math.round(1500 + SIGMA * probit(TIER_PMID[tier])); }
 
 function getK(t) {
   let k = t.comparisons <= 15 ? 48 : t.comparisons <= 40 ? 24 : 12;
-  for (const b of BOUNDARIES) {
-    if (Math.abs(t.rating - b) < 100) { k = 60; break; }
-  }
+  for (const b of BOUNDARIES) { if (Math.abs(t.rating - b) < 100) { k = 60; break; } }
   return k;
 }
 
@@ -888,16 +1501,30 @@ function updateElo(a, b, scoreA) {
   a.comparisons++; b.comparisons++;
   rsiDeltas.push((Math.abs(a.rating - pA) + Math.abs(b.rating - pB)) / 2);
   if (rsiDeltas.length > 100) rsiDeltas.shift();
+  // 신규 곡이 충분히 비교됐으면 isNew 해제
+  if (a.isNew && a.comparisons >= 8) a.isNew = false;
+  if (b.isNew && b.comparisons >= 8) b.isNew = false;
 }
 
 function getNextPair() {
   const pool = tracks.filter(t => t.tier !== null);
   if (pool.length < 2) return null;
-  pool.sort((a, b) => a.comparisons - b.comparisons);
-  const A = pool[0];
+
+  // 신규 곡(isNew) 우선: 8회 미만 비교된 신규 곡이 있으면 먼저 배정
+  const newPool = pool.filter(t => t.isNew && t.comparisons < 8);
+  let A;
+  if (newPool.length > 0) {
+    A = newPool.sort((a, b) => a.comparisons - b.comparisons)[0];
+  } else {
+    pool.sort((a, b) => a.comparisons - b.comparisons);
+    A = pool[0];
+  }
+
   let candidates = pool.filter(t => t !== A && t.tier === A.tier);
   if (!candidates.length) candidates = pool.filter(t => t !== A);
-  const preferred = candidates.filter(t => `${A.id}|${t.id}` !== lastPairKey && `${t.id}|${A.id}` !== lastPairKey);
+  const preferred = candidates.filter(t =>
+    `${A.id}|${t.id}` !== lastPairKey && `${t.id}|${A.id}` !== lastPairKey
+  );
   const finalPool = preferred.length ? preferred : candidates;
   finalPool.sort((a, b) => Math.abs(a.rating - A.rating) - Math.abs(b.rating - A.rating));
   return [A, finalPool[0]];
@@ -910,6 +1537,50 @@ function computeRSI() {
 }
 
 // ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let tracks      = [];
+let compCount   = 0;
+let rsiDeltas   = [];
+let tierHistory = [];
+let curPair     = null;
+let lastPairKey = '';
+
+function saveState() {
+  try { localStorage.setItem('eloState', JSON.stringify({ tracks, compCount, rsiDeltas, currentSource, savedAt: new Date().toISOString() })); } catch {}
+}
+
+function enableNav() {
+  ['tier','sort','rank'].forEach(id => document.getElementById(`tab-${id}`).disabled = false);
+  document.getElementById('syncBtn').style.display = 'inline-flex';
+}
+
+function initFromFetched(fetched) {
+  // 기존 세션이 있으면 병합, 없으면 새로 시작
+  if (tracks.length) {
+    const knownIds = new Set(tracks.map(t => t.id));
+    const truly_new = fetched.filter(t => !knownIds.has(t.id));
+    if (truly_new.length) {
+      truly_new.forEach(t => { t.isNew = true; });
+      tracks.push(...truly_new);
+      toast(`✅ 기존 세션에 ${truly_new.length}곡 추가됨`);
+    } else {
+      toast('✅ 신규 곡 없음 — 기존 세션 유지');
+    }
+  } else {
+    tracks      = fetched;
+    compCount   = 0;
+    rsiDeltas   = [];
+    tierHistory = [];
+    toast(`✅ ${tracks.length}곡 불러오기 완료`);
+  }
+  enableNav();
+  saveState();
+  const untiered = tracks.filter(t => t.tier === null);
+  goPhase(untiered.length ? 'tier' : 'sort');
+}
+
+// ══════════════════════════════════════════════
 //  PHASE MANAGEMENT
 // ══════════════════════════════════════════════
 function goPhase(name) {
@@ -917,90 +1588,12 @@ function goPhase(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`phase-${name}`).classList.add('active');
   document.getElementById(`tab-${name}`).classList.add('active');
-  
-  // 🌟 추가: 비교정렬 탭일 때만 main에 full-screen 속성 부여
   const mainEl = document.querySelector('main');
-  if (name === 'sort') {
-    mainEl.classList.add('sort-fullscreen');
-  } else {
-    mainEl.classList.remove('sort-fullscreen');
-  }
-
+  name === 'sort' ? mainEl.classList.add('sort-fullscreen') : mainEl.classList.remove('sort-fullscreen');
   if (name === 'tier')   renderTier();
   if (name === 'sort')   renderSort();
   if (name === 'rank')   renderRank();
-}
-
-function enableNav() {
-  ['tier','sort','rank'].forEach(id => document.getElementById(`tab-${id}`).disabled = false);
-}
-
-// ══════════════════════════════════════════════
-//  IMPORT
-// ══════════════════════════════════════════════
-function onFileInput(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  readJSON(file);
-}
-
-['dragover','dragleave','drop'].forEach(ev => {
-  document.getElementById('dropZone').addEventListener(ev, e => {
-    e.preventDefault();
-    const dz = document.getElementById('dropZone');
-    if (ev === 'dragover') dz.classList.add('dragging');
-    else if (ev === 'dragleave') dz.classList.remove('dragging');
-    else {
-      dz.classList.remove('dragging');
-      const file = e.dataTransfer.files[0];
-      if (file) readJSON(file);
-    }
-  });
-});
-
-function readJSON(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    try { initFrom(JSON.parse(e.target.result)); }
-    catch { toast('❌ JSON 파싱 오류'); }
-  };
-  reader.readAsText(file);
-}
-
-function initFrom(data) {
-  if (data.tracks && Array.isArray(data.tracks)) {
-    tracks = data.tracks;
-    compCount = data.compCount || 0;
-    rsiDeltas = data.rsiDeltas || [];
-    tierHistory = [];
-    toast('✅ 저장된 세션 불러오기 완료');
-  } else {
-    tracks = data.map(t => ({
-      id: t.id, name: t.name,
-      artists: Array.isArray(t.artists) ? t.artists : [t.artists],
-      image: t.image, album: t.album || '', uri: t.uri || '',
-      tier: null, rating: 1500, comparisons: 0,
-    }));
-    compCount = 0; rsiDeltas = []; tierHistory = [];
-    toast(`✅ ${tracks.length}곡 불러오기 완료`);
-  }
-  enableNav();
-  saveState();
-  const untiered = tracks.filter(t => t.tier === null);
-  if (untiered.length === 0) goPhase('sort');
-  else goPhase('tier');
-}
-
-function resumeSession() {
-  const raw = localStorage.getItem('eloState');
-  if (!raw) return;
-  try { initFrom(JSON.parse(raw)); } catch {}
-}
-
-function clearSession() {
-  localStorage.removeItem('eloState');
-  document.getElementById('savedPanel').style.display = 'none';
-  toast('🗑️ 세션 삭제됨');
+  if (name === 'import') checkCloudSession();
 }
 
 // ══════════════════════════════════════════════
@@ -1008,39 +1601,41 @@ function clearSession() {
 // ══════════════════════════════════════════════
 function renderTier() {
   const untiered = tracks.filter(t => t.tier === null);
-  const done = tracks.length - untiered.length;
-  const total = tracks.length;
+  const done     = tracks.length - untiered.length;
+  const total    = tracks.length;
 
   document.getElementById('tierProgress').style.width = `${(done/total)*100}%`;
-  document.getElementById('tierDone').textContent = `${done} / ${total} 완료`;
-  document.getElementById('tierLeft').textContent = untiered.length > 0 ? `남은 곡: ${untiered.length}` : '완료!';
-  document.getElementById('undoBtn').disabled = tierHistory.length === 0;
-  document.getElementById('skipBtn').style.display = done > 0 ? 'inline-flex' : 'none';
+  document.getElementById('tierDone').textContent     = `${done} / ${total} 완료`;
+  document.getElementById('tierLeft').textContent     = untiered.length > 0 ? `남은 곡: ${untiered.length}` : '완료!';
+  document.getElementById('undoBtn').disabled         = tierHistory.length === 0;
+  document.getElementById('skipBtn').style.display    = done > 0 ? 'inline-flex' : 'none';
 
   const c1 = tracks.filter(t=>t.tier===1).length;
   const c2 = tracks.filter(t=>t.tier===2).length;
   const c3 = tracks.filter(t=>t.tier===3).length;
-  const classified = c1 + c2 + c3;
-  const pct = (n) => classified > 0 ? ` (${Math.round(n/classified*100)}%)` : '';
-  document.getElementById('statT1').textContent = `${c1}곡${pct(c1)}`;
-  document.getElementById('statT2').textContent = `${c2}곡${pct(c2)}`;
-  document.getElementById('statT3').textContent = `${c3}곡${pct(c3)}`;
+  const classified = c1+c2+c3;
+  const pct = n => classified > 0 ? ` (${Math.round(n/classified*100)}%)` : '';
+  document.getElementById('statT1').textContent    = `${c1}곡${pct(c1)}`;
+  document.getElementById('statT2').textContent    = `${c2}곡${pct(c2)}`;
+  document.getElementById('statT3').textContent    = `${c3}곡${pct(c3)}`;
   document.getElementById('statUnset').textContent = untiered.length + '곡';
 
   if (untiered.length === 0) {
-    document.getElementById('tierMain').style.display = 'none';
+    document.getElementById('tierMain').style.display     = 'none';
     document.getElementById('tierComplete').style.display = 'block';
     document.getElementById('tierCompleteMsg').textContent = `최애: ${c1}곡 · 선호: ${c2}곡 · 보통: ${c3}곡`;
+    saveToSupabase();
     return;
   }
-  document.getElementById('tierMain').style.display = 'block';
+  document.getElementById('tierMain').style.display     = 'block';
   document.getElementById('tierComplete').style.display = 'none';
 
   const track = untiered[0];
-  document.getElementById('tierImg').src = track.image;
-  document.getElementById('tierName').textContent = track.name;
+  document.getElementById('tierImg').src            = track.image;
+  document.getElementById('tierName').textContent   = track.name;
   document.getElementById('tierArtist').textContent = track.artists.join(', ');
-  document.getElementById('tierAlbum').textContent = track.album;
+  document.getElementById('tierAlbum').textContent  = track.album;
+  document.getElementById('tierNewBadge').style.display = track.isNew ? 'inline-flex' : 'none';
   tierIsPlaying = false;
   updateTierPlayUI();
   tierAutoPlay(track.uri || `spotify:track:${track.id}`);
@@ -1051,7 +1646,7 @@ function assignTier(tier) {
   if (!untiered.length) return;
   const t = untiered[0];
   tierHistory.push({ id: t.id });
-  t.tier = tier;
+  t.tier   = tier;
   t.rating = initRating(tier);
   saveState();
   renderTier();
@@ -1066,10 +1661,7 @@ function undoTier() {
 }
 
 function skipRemainingToTier2() {
-  tracks.filter(t => t.tier === null).forEach(t => {
-    t.tier = 3;
-    t.rating = initRating(3);
-  });
+  tracks.filter(t => t.tier === null).forEach(t => { t.tier = 3; t.rating = initRating(3); });
   saveState();
   goPhase('sort');
 }
@@ -1079,26 +1671,19 @@ function skipRemainingToTier2() {
 // ══════════════════════════════════════════════
 function renderSort() {
   const tiered = tracks.filter(t => t.tier !== null);
-  document.getElementById('compCountDisplay').textContent = compCount;
+  document.getElementById('compCountDisplay').textContent  = compCount;
   document.getElementById('sortTieredDisplay').textContent = tiered.length;
 
   const rsi = computeRSI();
-  const rsiEl = document.getElementById('rsiValDisplay');
-  const fill = document.getElementById('rsiFill');
-  const status = document.getElementById('rsiStatus');
   if (rsi !== null) {
-    rsiEl.textContent = rsi.toFixed(1) + ' pt';
+    document.getElementById('rsiValDisplay').textContent = rsi.toFixed(1) + ' pt';
     const pct = Math.max(0, Math.min(100, (1 - rsi/50) * 100));
-    fill.style.width = pct + '%';
-    fill.style.background = rsi < 10 ? 'var(--accent)' : rsi < 25 ? 'var(--warn)' : 'var(--danger)';
-    status.style.display = rsi < 10 ? 'inline' : 'none';
+    document.getElementById('rsiFill').style.width      = pct + '%';
+    document.getElementById('rsiFill').style.background = rsi < 10 ? 'var(--accent)' : rsi < 25 ? 'var(--warn)' : 'var(--danger)';
+    document.getElementById('rsiStatus').style.display  = rsi < 10 ? 'inline' : 'none';
   }
 
-  if (tiered.length < 2) {
-    toast('⚠️ 먼저 티어 분류를 완료해주세요');
-    goPhase('tier');
-    return;
-  }
+  if (tiered.length < 2) { toast('⚠️ 먼저 티어 분류를 완료해주세요'); goPhase('tier'); return; }
 
   const pair = getNextPair();
   if (!pair) return;
@@ -1107,31 +1692,29 @@ function renderSort() {
   lastPairKey = `${A.id}|${B.id}`;
 
   const isClose = Math.abs(A.rating - B.rating) < 150;
-  document.getElementById('modeBadge').className = `mode-badge ${isClose ? 'mode-five' : 'mode-binary'}`;
+  document.getElementById('modeBadge').className   = `mode-badge ${isClose ? 'mode-five' : 'mode-binary'}`;
   document.getElementById('modeBadge').textContent = isClose ? '5단계 선택' : '이진 선택';
 
   if (isClose) {
-    document.getElementById('binaryMode').style.display = 'none';
+    document.getElementById('binaryMode').style.display   = 'none';
     document.getElementById('fiveStepMode').style.display = 'block';
-    document.getElementById('f5ImgA').src = A.image;
-    document.getElementById('f5NameA').textContent = A.name;
+    document.getElementById('f5ImgA').src     = A.image;
+    document.getElementById('f5NameA').textContent   = A.name;
     document.getElementById('f5ArtistA').textContent = A.artists.join(', ');
-    document.getElementById('f5EloA').textContent = Math.round(A.rating) + ' elo';
-    document.getElementById('f5ImgB').src = B.image;
-    document.getElementById('f5NameB').textContent = B.name;
+    document.getElementById('f5EloA').textContent    = Math.round(A.rating) + ' elo';
+    document.getElementById('f5ImgB').src     = B.image;
+    document.getElementById('f5NameB').textContent   = B.name;
     document.getElementById('f5ArtistB').textContent = B.artists.join(', ');
-    document.getElementById('f5EloB').textContent = Math.round(B.rating) + ' elo';
+    document.getElementById('f5EloB').textContent    = Math.round(B.rating) + ' elo';
   } else {
-    document.getElementById('binaryMode').style.display = 'block';
+    document.getElementById('binaryMode').style.display   = 'block';
     document.getElementById('fiveStepMode').style.display = 'none';
-    document.getElementById('bImgA').src = A.image;
-    document.getElementById('bNameA').textContent = A.name;
+    document.getElementById('bImgA').src = A.image; document.getElementById('bNameA').textContent   = A.name;
     document.getElementById('bArtistA').textContent = A.artists.join(', ');
-    document.getElementById('bEloA').textContent = Math.round(A.rating);
-    document.getElementById('bImgB').src = B.image;
-    document.getElementById('bNameB').textContent = B.name;
+    document.getElementById('bEloA').textContent    = Math.round(A.rating);
+    document.getElementById('bImgB').src = B.image; document.getElementById('bNameB').textContent   = B.name;
     document.getElementById('bArtistB').textContent = B.artists.join(', ');
-    document.getElementById('bEloB').textContent = Math.round(B.rating);
+    document.getElementById('bEloB').textContent    = Math.round(B.rating);
   }
 
   document.getElementById('sortEmbedA').src = `https://open.spotify.com/embed/track/${A.id}?utm_source=generator&theme=0`;
@@ -1151,41 +1734,30 @@ function choose(scoreA) {
 //  RANK PHASE
 // ══════════════════════════════════════════════
 function renderRank() {
-  const sorted = [...tracks].sort((a, b) => {
-    if (a.tier !== b.tier) return a.tier - b.tier;
-    return b.rating - a.rating;
-  });
-
+  const sorted = [...tracks].sort((a, b) => a.tier !== b.tier ? a.tier - b.tier : b.rating - a.rating);
   document.getElementById('rankMeta').textContent =
     `${tracks.length}곡 · 비교 ${compCount}회 · 최애: ${tracks.filter(t=>t.tier===1).length}곡 / 선호: ${tracks.filter(t=>t.tier===2).length}곡 / 보통: ${tracks.filter(t=>t.tier===3).length}곡`;
 
   const list = document.getElementById('rankList');
   list.innerHTML = '';
-
   const tierLabels = {1:'💛 Tier 1 — 최애', 2:'👍 Tier 2 — 선호', 3:'🎵 Tier 3 — 보통'};
   const tierClass  = {1:'ts1', 2:'ts2', 3:'ts3'};
   const rtClass    = {1:'rt1', 2:'rt2', 3:'rt3'};
-  const numClass   = (r) => r===1?'gold':r===2?'silver':r===3?'bronze':'';
+  const numClass   = r => r===1?'gold':r===2?'silver':r===3?'bronze':'';
+  const allSorted  = [...tracks].sort((a,b) => b.rating - a.rating);
+  const globalRank = {};
+  allSorted.forEach((t,i) => globalRank[t.id] = i+1);
 
   let curTier = null;
-  let tierCount = 0;
-
-  const allSorted = [...tracks].sort((a,b) => b.rating - a.rating);
-  const globalRank = {};
-  allSorted.forEach((t, i) => globalRank[t.id] = i + 1);
-
   sorted.forEach(track => {
     if (track.tier !== curTier) {
       curTier = track.tier;
-      tierCount = 0;
-      const count = sorted.filter(t=>t.tier===curTier).length;
+      const count = sorted.filter(t => t.tier === curTier).length;
       const hdr = document.createElement('div');
       hdr.className = `tier-section-header ${tierClass[curTier]}`;
       hdr.textContent = `${tierLabels[curTier]}  (${count}곡)`;
       list.appendChild(hdr);
     }
-    tierCount++;
-
     const grank = globalRank[track.id];
     const div = document.createElement('div');
     div.className = 'rank-item';
@@ -1193,33 +1765,14 @@ function renderRank() {
       <div class="rank-num ${numClass(grank)}">#${grank}</div>
       <img class="rank-img" src="${track.image}" alt="" loading="lazy">
       <div class="rank-info">
-        <div class="rank-name">${track.tier !== null ? track.name : '(미분류) ' + track.name}</div>
-        <div class="rank-artist">${track.artists.join(', ')}${track.album ? ' · ' + track.album : ''}</div>
+        <div class="rank-name">${track.isNew ? '✦ ' : ''}${track.name}</div>
+        <div class="rank-artist">${track.artists.join(', ')}${track.album ? ' · '+track.album : ''}</div>
       </div>
-      <div class="rank-tier ${rtClass[track.tier] || ''}">T${track.tier || '?'}</div>
+      <div class="rank-tier ${rtClass[track.tier]||''}">T${track.tier||'?'}</div>
       <div class="rank-elo">${Math.round(track.rating)}</div>
-      <div class="rank-comps" title="${track.comparisons}회 비교">${track.comparisons}x</div>
-    `;
+      <div class="rank-comps" title="${track.comparisons}회 비교">${track.comparisons}x</div>`;
     list.appendChild(div);
   });
-}
-
-// ══════════════════════════════════════════════
-//  PERSISTENCE
-// ══════════════════════════════════════════════
-function saveState() {
-  const state = { tracks, compCount, rsiDeltas, savedAt: new Date().toISOString() };
-  try { localStorage.setItem('eloState', JSON.stringify(state)); } catch {}
-}
-
-function exportJSON() {
-  const state = { tracks, compCount, rsiDeltas, savedAt: new Date().toISOString() };
-  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `elo_session_${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  toast('💾 JSON 내보내기 완료');
 }
 
 // ══════════════════════════════════════════════
@@ -1235,7 +1788,6 @@ document.addEventListener('keydown', e => {
     else if (e.key==='3') assignTier(3);
     else if (e.key.toLowerCase()==='z') undoTier();
   }
-
   if (phase === 'phase-sort') {
     const isClose = document.getElementById('fiveStepMode').style.display !== 'none';
     if (isClose) {
@@ -1245,8 +1797,8 @@ document.addEventListener('keydown', e => {
       else if (e.key==='4') choose(0.3);
       else if (e.key==='5') choose(0.0);
     } else {
-      if (e.key==='ArrowLeft'  || e.key==='a' || e.key==='1') choose(1.0);
-      else if (e.key==='ArrowRight' || e.key==='d' || e.key==='2') choose(0.0);
+      if (e.key==='ArrowLeft'||e.key==='a'||e.key==='1') choose(1.0);
+      else if (e.key==='ArrowRight'||e.key==='d'||e.key==='2') choose(0.0);
     }
   }
 });
@@ -1260,24 +1812,49 @@ function toast(msg) {
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
 }
 
 // ══════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════
-window.addEventListener('load', () => {
-  const raw = localStorage.getItem('eloState');
-  if (!raw) return;
-  try {
-    const s = JSON.parse(raw);
-    if (!s.tracks?.length) return;
-    const tiered = s.tracks.filter(t=>t.tier!==null).length;
-    document.getElementById('savedInfo').textContent =
-      `${s.tracks.length}곡 · ${tiered}곡 분류 · ${s.compCount || 0}회 비교 · ${new Date(s.savedAt).toLocaleString('ko-KR')}`;
-    document.getElementById('savedPanel').style.display = 'flex';
-  } catch {}
+window.addEventListener('load', async () => {
+  loadCfg();
+
+  // OAuth 콜백 처리
+  const params = new URLSearchParams(window.location.search);
+  const code   = params.get('code');
+  if (code) {
+    const ok = await handleOAuthCallback(code);
+    if (!ok) return;
+    toast('✅ Spotify 로그인 완료');
+  }
+
+  if (isLoggedIn()) {
+    document.getElementById('connectView').style.display = 'none';
+    document.getElementById('sourceView').style.display  = 'block';
+    await loadUserProfile().catch(() => {});
+    checkCloudSession();
+
+    // localStorage 세션 복원
+    const raw = localStorage.getItem('eloState');
+    if (raw) {
+      try {
+        const s = JSON.parse(raw);
+        if (s.tracks?.length) {
+          tracks        = s.tracks;
+          compCount     = s.compCount  || 0;
+          rsiDeltas     = s.rsiDeltas  || [];
+          currentSource = s.currentSource || 'liked';
+          enableNav();
+          document.getElementById('likedCountText').textContent =
+            `마지막 동기화: ${new Date(s.savedAt).toLocaleString('ko-KR')} · ${tracks.length}곡`;
+        }
+      } catch {}
+    }
+  }
 });
 </script>
+<script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 </body>
 </html>
